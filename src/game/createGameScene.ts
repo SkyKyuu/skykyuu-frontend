@@ -1,0 +1,30 @@
+import type { Engine } from '@babylonjs/core/Engines/engine'
+import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight'
+import { Color4 } from '@babylonjs/core/Maths/math.color'
+import { Vector3 } from '@babylonjs/core/Maths/math.vector'
+import { Scene } from '@babylonjs/core/scene'
+import { configureGameplayCameras } from '@/game/camera/configureGameplayCameras'
+import type { LocalCameraPlayer } from '@/game/camera/gameplayCameraTypes'
+import { createIndoorCourt } from '@/game/court/createIndoorCourt'
+
+const PREVIEW_LOCAL_PLAYERS: readonly LocalCameraPlayer[] = [
+  { localPlayerId: 'player-1', teamSide: 'A' },
+  { localPlayerId: 'player-2', teamSide: 'B' },
+]
+
+export function createGameScene(engine: Engine): Scene {
+  const scene = new Scene(engine)
+  scene.clearColor = new Color4(0.04, 0.06, 0.1, 1)
+
+  const light = new HemisphericLight(
+    'validation-light',
+    new Vector3(0, 1, 0),
+    scene,
+  )
+  light.intensity = 0.85
+
+  createIndoorCourt(scene)
+  configureGameplayCameras(scene, PREVIEW_LOCAL_PLAYERS)
+
+  return scene
+}
