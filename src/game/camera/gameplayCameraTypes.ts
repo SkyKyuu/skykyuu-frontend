@@ -1,4 +1,6 @@
-export type TeamSide = 'A' | 'B'
+import type { TeamSide } from '@/game/team/teamTypes'
+
+export type { TeamSide } from '@/game/team/teamTypes'
 
 export interface LocalCameraPlayer {
   localPlayerId: string
