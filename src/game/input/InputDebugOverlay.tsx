@@ -1,7 +1,14 @@
 import type { LocalPlayerInputSnapshot } from '@/game/input/inputTypes'
 
 interface InputDebugOverlayProps {
-  snapshots: readonly LocalPlayerInputSnapshot[]
+  snapshots: readonly PlayerDebugSnapshot[]
+}
+
+export interface PlayerDebugSnapshot extends LocalPlayerInputSnapshot {
+  position: {
+    x: number
+    z: number
+  }
 }
 
 function formatValue(value: number): string {
@@ -49,6 +56,10 @@ export function InputDebugOverlay({ snapshots }: InputDebugOverlayProps) {
             <dd>{formatValue(snapshot.worldMove.worldX)}</dd>
             <dt>World Z</dt>
             <dd>{formatValue(snapshot.worldMove.worldZ)}</dd>
+            <dt>Position X</dt>
+            <dd>{formatValue(snapshot.position.x)}</dd>
+            <dt>Position Z</dt>
+            <dd>{formatValue(snapshot.position.z)}</dd>
             <dt>Jump Held</dt>
             <dd>{snapshot.jumpHeld ? 'true' : 'false'}</dd>
           </dl>

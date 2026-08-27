@@ -2,6 +2,7 @@ import type { Engine } from '@babylonjs/core/Engines/engine'
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight'
 import { Color4 } from '@babylonjs/core/Maths/math.color'
 import { Vector3 } from '@babylonjs/core/Maths/math.vector'
+import type { TransformNode } from '@babylonjs/core/Meshes/transformNode'
 import { Scene } from '@babylonjs/core/scene'
 import { configureGameplayCameras } from '@/game/camera/configureGameplayCameras'
 import { createIndoorCourt } from '@/game/court/createIndoorCourt'
@@ -14,8 +15,14 @@ const PREVIEW_LOCAL_PLAYERS = INDOOR_PLAYER_SPAWNS.map(
   ({ playerId, teamSide }) => ({ localPlayerId: playerId, teamSide }),
 )
 
-export function createGameScene(engine: Engine): Scene {
+export interface GameSceneResult {
+  scene: Scene
+  playerRoots: ReadonlyMap<string, TransformNode>
+}
+
+export function createGameScene(engine: Engine): GameSceneResult {
   const scene = new Scene(engine)
+  const playerRoots = new Map<string, TransformNode>()
   scene.clearColor = new Color4(0.04, 0.06, 0.1, 1)
 
   const light = new HemisphericLight(
@@ -28,9 +35,9 @@ export function createGameScene(engine: Engine): Scene {
   createIndoorCourt(scene)
   createIndoorNet(scene, { height: INDOOR_NET_HEIGHTS.men })
   INDOOR_PLAYER_SPAWNS.forEach((player) => {
-    createPlaceholderPlayer(scene, player)
+    playerRoots.set(player.playerId, createPlaceholderPlayer(scene, player))
   })
   configureGameplayCameras(scene, PREVIEW_LOCAL_PLAYERS)
 
-  return scene
+  return { scene, playerRoots }
 }

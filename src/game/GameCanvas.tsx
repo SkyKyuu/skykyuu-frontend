@@ -1,20 +1,26 @@
 import { Engine } from '@babylonjs/core/Engines/engine'
 import { useEffect, useRef, useState } from 'react'
 import { createGameScene } from '@/game/createGameScene'
-import { InputDebugOverlay } from '@/game/input/InputDebugOverlay'
+import {
+  InputDebugOverlay,
+  type PlayerDebugSnapshot,
+} from '@/game/input/InputDebugOverlay'
 import { LOCAL_INPUT_CONFIG } from '@/game/input/inputConfig'
 import { LocalInputManager } from '@/game/input/LocalInputManager'
-import type { LocalPlayerInputSnapshot } from '@/game/input/inputTypes'
 import { createPreviewInputBindings } from '@/game/input/previewInputBindings'
+import {
+  PlayerMovementController,
+  type PlayerMovementTarget,
+} from '@/game/movement/PlayerMovementController'
 import { INDOOR_PLAYER_SPAWNS } from '@/game/player/indoorPlayerSpawns'
 
 const PREVIEW_INPUT_BINDINGS = createPreviewInputBindings(INDOOR_PLAYER_SPAWNS)
 
 function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [debugSnapshots, setDebugSnapshots] = useState<
-    readonly LocalPlayerInputSnapshot[]
-  >([])
+  const [debugSnapshots, setDebugSnapshots] = useState<readonly PlayerDebugSnapshot[]>(
+    [],
+  )
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -24,20 +30,51 @@ function GameCanvas() {
     }
 
     const engine = new Engine(canvas, true)
-    const scene = createGameScene(engine)
+    const { scene, playerRoots } = createGameScene(engine)
     const inputManager = new LocalInputManager(PREVIEW_INPUT_BINDINGS)
+    const movementTargets: PlayerMovementTarget[] = INDOOR_PLAYER_SPAWNS.map(
+      ({ playerId, teamSide }) => {
+        const playerRoot = playerRoots.get(playerId)
+
+        if (!playerRoot) {
+          throw new Error(`Missing movement root for ${playerId}`)
+        }
+
+        return { playerId, teamSide, position: playerRoot.position }
+      },
+    )
+    const movementController = new PlayerMovementController(movementTargets)
     let lastDebugUpdate = -Infinity
 
     inputManager.start()
     const renderScene = () => {
-      inputManager.update()
+      const snapshots = inputManager.update()
+      const deltaSeconds = engine.getDeltaTime() / 1000
+
+      movementController.update(snapshots, deltaSeconds)
 
       if (
         import.meta.env.DEV &&
         performance.now() - lastDebugUpdate >=
           LOCAL_INPUT_CONFIG.debugUpdateIntervalMs
       ) {
-        setDebugSnapshots(inputManager.getSnapshots())
+        setDebugSnapshots(
+          snapshots.flatMap((snapshot) => {
+            const playerRoot = playerRoots.get(snapshot.playerId)
+
+            return playerRoot
+              ? [
+                  {
+                    ...snapshot,
+                    position: {
+                      x: playerRoot.position.x,
+                      z: playerRoot.position.z,
+                    },
+                  },
+                ]
+              : []
+          }),
+        )
         lastDebugUpdate = performance.now()
       }
 
