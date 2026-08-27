@@ -6,6 +6,8 @@ import { Scene } from '@babylonjs/core/scene'
 import { configureGameplayCameras } from '@/game/camera/configureGameplayCameras'
 import type { LocalCameraPlayer } from '@/game/camera/gameplayCameraTypes'
 import { createIndoorCourt } from '@/game/court/createIndoorCourt'
+import { createIndoorNet } from '@/game/net/createIndoorNet'
+import { INDOOR_NET_HEIGHTS } from '@/game/net/indoorNetDimensions'
 
 const PREVIEW_LOCAL_PLAYERS: readonly LocalCameraPlayer[] = [
   { localPlayerId: 'player-1', teamSide: 'A' },
@@ -24,6 +26,7 @@ export function createGameScene(engine: Engine): Scene {
   light.intensity = 0.85
 
   createIndoorCourt(scene)
+  createIndoorNet(scene, { height: INDOOR_NET_HEIGHTS.men })
   configureGameplayCameras(scene, PREVIEW_LOCAL_PLAYERS)
 
   return scene
