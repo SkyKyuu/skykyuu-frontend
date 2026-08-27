@@ -2,7 +2,7 @@ import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera'
 import { Vector3 } from '@babylonjs/core/Maths/math.vector'
 import type { Scene } from '@babylonjs/core/scene'
 import { GAMEPLAY_CAMERA_CONFIG } from '@/game/camera/gameplayCameraConfig'
-import type { TeamSide } from '@/game/camera/gameplayCameraTypes'
+import type { TeamSide } from '@/game/team/teamTypes'
 
 export function createGameplayCamera(
   scene: Scene,
