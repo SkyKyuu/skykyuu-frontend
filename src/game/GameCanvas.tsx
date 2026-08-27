@@ -61,15 +61,21 @@ function GameCanvas() {
         setDebugSnapshots(
           snapshots.flatMap((snapshot) => {
             const playerRoot = playerRoots.get(snapshot.playerId)
+            const movementState = movementController.getPlayerState(
+              snapshot.playerId,
+            )
 
-            return playerRoot
+            return playerRoot && movementState
               ? [
                   {
                     ...snapshot,
                     position: {
                       x: playerRoot.position.x,
+                      y: playerRoot.position.y,
                       z: playerRoot.position.z,
                     },
+                    grounded: movementState.grounded,
+                    verticalVelocity: movementState.verticalVelocity,
                   },
                 ]
               : []

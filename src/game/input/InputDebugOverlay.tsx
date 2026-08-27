@@ -7,8 +7,11 @@ interface InputDebugOverlayProps {
 export interface PlayerDebugSnapshot extends LocalPlayerInputSnapshot {
   position: {
     x: number
+    y: number
     z: number
   }
+  grounded: boolean
+  verticalVelocity: number
 }
 
 function formatValue(value: number): string {
@@ -58,8 +61,14 @@ export function InputDebugOverlay({ snapshots }: InputDebugOverlayProps) {
             <dd>{formatValue(snapshot.worldMove.worldZ)}</dd>
             <dt>Position X</dt>
             <dd>{formatValue(snapshot.position.x)}</dd>
+            <dt>Position Y</dt>
+            <dd>{formatValue(snapshot.position.y)}</dd>
             <dt>Position Z</dt>
             <dd>{formatValue(snapshot.position.z)}</dd>
+            <dt>Grounded</dt>
+            <dd>{snapshot.grounded ? 'true' : 'false'}</dd>
+            <dt>Vertical Velocity</dt>
+            <dd>{formatValue(snapshot.verticalVelocity)}</dd>
             <dt>Jump Held</dt>
             <dd>{snapshot.jumpHeld ? 'true' : 'false'}</dd>
           </dl>
