@@ -1,5 +1,4 @@
 import { INDOOR_BALL_SPAWN } from '@/game/ball/indoorBallSpawn'
-import { VOLLEYBALL_CONFIG } from '@/game/ball/volleyballConfig'
 import type {
   BallVector3,
   VolleyballState,
@@ -24,11 +23,4 @@ export function createPreviewVolleyballState(): VolleyballState {
       z: PREVIEW_BALL_LAUNCH_VELOCITY.z,
     },
   }
-}
-
-// This is preview lifecycle policy, not a ground collision, bounce, or rule.
-export function shouldRespawnPreviewVolleyball(
-  state: VolleyballState,
-): boolean {
-  return state.position.y <= VOLLEYBALL_CONFIG.radius
 }

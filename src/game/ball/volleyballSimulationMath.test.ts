@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createPreviewVolleyballState } from '@/game/ball/previewVolleyballState'
+import { VOLLEYBALL_CONFIG } from '@/game/ball/volleyballConfig'
 import { VOLLEYBALL_SIMULATION_CONFIG } from '@/game/ball/volleyballSimulationConfig'
-import { stepVolleyballFreeFlight } from '@/game/ball/volleyballSimulationMath'
+import {
+  findGroundContactTime,
+  stepVolleyballFreeFlight,
+} from '@/game/ball/volleyballSimulationMath'
 
 describe('stepVolleyballFreeFlight', () => {
   it('integrates one known gravity step', () => {
@@ -47,6 +51,33 @@ describe('stepVolleyballFreeFlight', () => {
     expect(nextState).not.toBe(state)
     expect(nextState.position).not.toBe(state.position)
     expect(nextState.velocity).not.toBe(state.velocity)
+  })
+
+  it('finds the descending ground contact inside a fixed step', () => {
+    const state = {
+      position: { x: 2, y: 0.2, z: 3 },
+      velocity: { x: 4, y: -1, z: 5 },
+    }
+    const contactTime = findGroundContactTime(state, 0.1)
+
+    expect(contactTime).not.toBeNull()
+    expect(contactTime).toBeGreaterThanOrEqual(0)
+    expect(contactTime).toBeLessThanOrEqual(0.1)
+
+    const impactState = stepVolleyballFreeFlight(state, contactTime ?? 0)
+    expect(impactState.position.y).toBeCloseTo(VOLLEYBALL_CONFIG.radius)
+    expect(impactState.velocity.y).toBeCloseTo(
+      state.velocity.y - VOLLEYBALL_SIMULATION_CONFIG.gravity * (contactTime ?? 0),
+    )
+  })
+
+  it('returns null when the ball stays above the ground during the step', () => {
+    const state = {
+      position: { x: 0, y: 3, z: 0 },
+      velocity: { x: 0, y: 3, z: 0 },
+    }
+
+    expect(findGroundContactTime(state, 1 / 60)).toBeNull()
   })
 
   it('matches the ballistic equation after 60 fixed steps', () => {

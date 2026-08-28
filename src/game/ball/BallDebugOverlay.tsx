@@ -1,4 +1,5 @@
 import type { BallVector3 } from '@/game/ball/volleyballState'
+import type { BallGroundContactEvent } from '@/game/ball/ballGroundContact'
 import { VOLLEYBALL_SIMULATION_CONFIG } from '@/game/ball/volleyballSimulationConfig'
 
 interface BallDebugOverlayProps {
@@ -10,6 +11,7 @@ export interface BallDebugSnapshot {
   velocity: BallVector3
   accumulatorSeconds: number
   totalSimulationSteps: number
+  lastLanding: BallGroundContactEvent | null
 }
 
 function formatValue(value: number): string {
@@ -51,6 +53,21 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
         <dt>Fixed Hz</dt>
         <dd>{fixedHz.toFixed(0)}</dd>
       </dl>
+      {snapshot.lastLanding ? (
+        <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 border-t border-slate-700 pt-2">
+          <dt className="col-span-2 font-semibold text-amber-300">Last Landing</dt>
+          <dt>Result</dt>
+          <dd>{snapshot.lastLanding.courtResult}</dd>
+          <dt>Side</dt>
+          <dd>{snapshot.lastLanding.courtSide}</dd>
+          <dt>X</dt>
+          <dd>{formatValue(snapshot.lastLanding.position.x)}</dd>
+          <dt>Z</dt>
+          <dd>{formatValue(snapshot.lastLanding.position.z)}</dd>
+          <dt>Impact Vy</dt>
+          <dd>{formatValue(snapshot.lastLanding.velocity.y)}</dd>
+        </dl>
+      ) : null}
     </aside>
   )
 }
