@@ -12,6 +12,11 @@ import {
   findGroundContactTime,
   stepVolleyballFreeFlight,
 } from '@/game/ball/volleyballSimulationMath'
+import {
+  createPlayerBallContactEvent,
+  isBallOverlappingPlayer,
+  type PlayerBallContactTarget,
+} from '@/game/contact/playerBallContact'
 
 const STEP_COMPARISON_EPSILON = 1e-12
 
@@ -36,6 +41,7 @@ export class FixedStepVolleyballSimulator {
   private accumulatedSeconds = 0
   private simulationStepCount = 0
   private groundContactOccurred = false
+  private activePlayerContactIds = new Set<string>()
 
   constructor(initialState: VolleyballState) {
     this.state = copyVolleyballState(initialState)
@@ -53,7 +59,10 @@ export class FixedStepVolleyballSimulator {
     return copyVolleyballState(this.state)
   }
 
-  advance(frameDeltaSeconds: number): BallSimulationAdvanceResult {
+  advance(
+    frameDeltaSeconds: number,
+    playerContactTargets: readonly PlayerBallContactTarget[] = [],
+  ): BallSimulationAdvanceResult {
     const safeFrameDeltaSeconds = getSafeFrameDeltaSeconds(frameDeltaSeconds)
 
     if (safeFrameDeltaSeconds === 0) {
@@ -85,6 +94,12 @@ export class FixedStepVolleyballSimulator {
         stateAtImpact.position.y = VOLLEYBALL_CONFIG.radius
         this.state = stateAtImpact
         events.push(
+          ...this.detectPlayerContacts(
+            stateAtImpact,
+            playerContactTargets,
+          ),
+        )
+        events.push(
           createBallGroundContactEvent(
             stateAtImpact.position,
             stateAtImpact.velocity,
@@ -98,6 +113,9 @@ export class FixedStepVolleyballSimulator {
       }
 
       this.state = stepVolleyballFreeFlight(this.state, fixedStepSeconds)
+      events.push(
+        ...this.detectPlayerContacts(this.state, playerContactTargets),
+      )
       this.accumulatedSeconds -= fixedStepSeconds
       executedSteps += 1
       this.simulationStepCount += 1
@@ -110,10 +128,37 @@ export class FixedStepVolleyballSimulator {
     return { executedSteps, events }
   }
 
+  private detectPlayerContacts(
+    ballState: VolleyballState,
+    playerContactTargets: readonly PlayerBallContactTarget[],
+  ): BallSimulationEvent[] {
+    // F2.4 samples overlap at fixed-step states. Swept/continuous collision can
+    // replace this detector later without changing the PLAYER_CONTACT contract.
+    const currentContactIds = new Set<string>()
+    const events: BallSimulationEvent[] = []
+
+    for (const target of playerContactTargets) {
+      if (!isBallOverlappingPlayer(ballState.position, target)) {
+        continue
+      }
+
+      currentContactIds.add(target.playerId)
+
+      if (!this.activePlayerContactIds.has(target.playerId)) {
+        events.push(createPlayerBallContactEvent(ballState, target))
+      }
+    }
+
+    this.activePlayerContactIds = currentContactIds
+
+    return events
+  }
+
   reset(state: VolleyballState): void {
     this.state = copyVolleyballState(state)
     this.accumulatedSeconds = 0
     this.simulationStepCount = 0
     this.groundContactOccurred = false
+    this.activePlayerContactIds.clear()
   }
 }

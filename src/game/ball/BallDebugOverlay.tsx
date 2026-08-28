@@ -1,6 +1,7 @@
 import type { BallVector3 } from '@/game/ball/volleyballState'
 import type { BallGroundContactEvent } from '@/game/ball/ballGroundContact'
 import { VOLLEYBALL_SIMULATION_CONFIG } from '@/game/ball/volleyballSimulationConfig'
+import type { PlayerBallContactEvent } from '@/game/contact/playerBallContact'
 
 interface BallDebugOverlayProps {
   snapshot: BallDebugSnapshot | null
@@ -12,6 +13,7 @@ export interface BallDebugSnapshot {
   accumulatorSeconds: number
   totalSimulationSteps: number
   lastLanding: BallGroundContactEvent | null
+  lastPlayerContact: PlayerBallContactEvent | null
 }
 
 function formatValue(value: number): string {
@@ -66,6 +68,25 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
           <dd>{formatValue(snapshot.lastLanding.position.z)}</dd>
           <dt>Impact Vy</dt>
           <dd>{formatValue(snapshot.lastLanding.velocity.y)}</dd>
+        </dl>
+      ) : null}
+      {snapshot.lastPlayerContact ? (
+        <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 border-t border-slate-700 pt-2">
+          <dt className="col-span-2 font-semibold text-cyan-300">
+            Last Player Contact
+          </dt>
+          <dt>Player ID</dt>
+          <dd>{snapshot.lastPlayerContact.playerId}</dd>
+          <dt>Team</dt>
+          <dd>{snapshot.lastPlayerContact.teamSide}</dd>
+          <dt>Ball X</dt>
+          <dd>{formatValue(snapshot.lastPlayerContact.ballPosition.x)}</dd>
+          <dt>Ball Y</dt>
+          <dd>{formatValue(snapshot.lastPlayerContact.ballPosition.y)}</dd>
+          <dt>Ball Z</dt>
+          <dd>{formatValue(snapshot.lastPlayerContact.ballPosition.z)}</dd>
+          <dt>Ball Vy</dt>
+          <dd>{formatValue(snapshot.lastPlayerContact.ballVelocity.y)}</dd>
         </dl>
       ) : null}
     </aside>

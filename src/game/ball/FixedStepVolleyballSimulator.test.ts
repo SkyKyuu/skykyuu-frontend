@@ -168,7 +168,15 @@ describe('preview volleyball lifecycle', () => {
       courtSide: 'B',
       position: { x: 0, y: VOLLEYBALL_CONFIG.radius },
     })
-    expect(result.events[0]?.velocity.y).toBeLessThan(0)
+    const groundContact = result.events[0]
+
+    expect(groundContact?.type).toBe('GROUND_CONTACT')
+
+    if (groundContact?.type !== 'GROUND_CONTACT') {
+      throw new Error('Expected a ground contact event')
+    }
+
+    expect(groundContact.velocity.y).toBeLessThan(0)
     expect(simulator.getState().position.y).toBe(VOLLEYBALL_CONFIG.radius)
     expect(simulator.advance(1)).toEqual({ executedSteps: 0, events: [] })
 
@@ -195,6 +203,11 @@ describe('preview volleyball lifecycle', () => {
       courtSide: 'B',
       position: { x: 0, y: VOLLEYBALL_CONFIG.radius },
     })
-    expect(landingEvent?.position.z).toBeGreaterThan(0)
+
+    if (landingEvent?.type !== 'GROUND_CONTACT') {
+      throw new Error('Expected the preview to end with ground contact')
+    }
+
+    expect(landingEvent.position.z).toBeGreaterThan(0)
   })
 })

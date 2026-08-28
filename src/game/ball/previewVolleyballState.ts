@@ -6,7 +6,7 @@ import type {
 
 export const PREVIEW_BALL_LAUNCH_VELOCITY: Readonly<BallVector3> = {
   x: 0,
-  y: 3,
+  y: 4.5,
   z: 6,
 }
 
