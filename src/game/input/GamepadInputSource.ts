@@ -10,7 +10,10 @@ const NEUTRAL_GAMEPAD_STATE: InputSourceState = {
   deviceName: 'Gamepad',
   localMove: { lateral: 0, forward: 0 },
   jumpHeld: false,
+  hitHeld: false,
 }
+
+const BUTTON_PRESS_THRESHOLD = 0.5
 
 export function getNativeGamepads(): GamepadList {
   if (
@@ -62,7 +65,8 @@ export class GamepadInputSource {
 
     const lateral = gamepad.axes[0] ?? 0
     const forward = -(gamepad.axes[1] ?? 0)
-    const primaryButton = gamepad.buttons[0]
+    const jumpButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.jump]
+    const hitButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.hit]
 
     return {
       connected: true,
@@ -71,7 +75,13 @@ export class GamepadInputSource {
         { lateral, forward },
         LOCAL_INPUT_CONFIG.gamepadDeadzone,
       ),
-      jumpHeld: Boolean(primaryButton?.pressed || (primaryButton?.value ?? 0) > 0.5),
+      jumpHeld: Boolean(
+        jumpButton?.pressed ||
+          (jumpButton?.value ?? 0) > BUTTON_PRESS_THRESHOLD,
+      ),
+      hitHeld: Boolean(
+        hitButton?.pressed || (hitButton?.value ?? 0) > BUTTON_PRESS_THRESHOLD,
+      ),
     }
   }
 }

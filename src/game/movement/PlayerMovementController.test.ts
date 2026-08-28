@@ -36,6 +36,8 @@ function createSnapshot(
     worldMove: { worldX, worldZ },
     jumpHeld,
     jumpPressed,
+    hitHeld: false,
+    hitPressed: false,
   }
 }
 

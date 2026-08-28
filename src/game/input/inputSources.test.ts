@@ -21,11 +21,17 @@ function keyUp(code: string): void {
 function createGamepad({
   axes = [0, 0],
   buttonPressed = false,
+  buttonValue = buttonPressed ? 1 : 0,
+  hitButtonPressed = false,
+  hitButtonValue = hitButtonPressed ? 1 : 0,
   connected = true,
   id = 'Test Standard Gamepad',
 }: {
   axes?: readonly number[]
   buttonPressed?: boolean
+  buttonValue?: number
+  hitButtonPressed?: boolean
+  hitButtonValue?: number
   connected?: boolean
   id?: string
 } = {}): Gamepad {
@@ -35,7 +41,12 @@ function createGamepad({
       {
         pressed: buttonPressed,
         touched: buttonPressed,
-        value: buttonPressed ? 1 : 0,
+        value: buttonValue,
+      },
+      {
+        pressed: hitButtonPressed,
+        touched: hitButtonPressed,
+        value: hitButtonValue,
       },
     ],
     connected,
@@ -94,15 +105,39 @@ describe('KeyboardInputSource', () => {
     expect(source.read().jumpHeld).toBe(false)
   })
 
+  it('reports KeyE as hit held and clears it on keyup', () => {
+    const source = startKeyboard()
+    keyDown('KeyE')
+    expect(source.read().hitHeld).toBe(true)
+
+    keyUp('KeyE')
+    expect(source.read().hitHeld).toBe(false)
+  })
+
+  it('keeps keyboard jump and hit independent and allows both together', () => {
+    const source = startKeyboard()
+    keyDown('Space')
+    expect(source.read()).toMatchObject({ jumpHeld: true, hitHeld: false })
+
+    keyUp('Space')
+    keyDown('KeyE')
+    expect(source.read()).toMatchObject({ jumpHeld: false, hitHeld: true })
+
+    keyDown('Space')
+    expect(source.read()).toMatchObject({ jumpHeld: true, hitHeld: true })
+  })
+
   it('clears all pressed keys when the window blurs', () => {
     const source = startKeyboard()
     keyDown('KeyW')
     keyDown('Space')
+    keyDown('KeyE')
     window.dispatchEvent(new Event('blur'))
 
     expect(source.read()).toMatchObject({
       localMove: { lateral: 0, forward: 0 },
       jumpHeld: false,
+      hitHeld: false,
     })
   })
 
@@ -134,6 +169,43 @@ describe('GamepadInputSource', () => {
     ).toBe(true)
   })
 
+  it('reads pressed button 1 as hit held', () => {
+    const source = new GamepadInputSource(0)
+
+    expect(
+      source.read([createGamepad({ hitButtonPressed: true })]).hitHeld,
+    ).toBe(true)
+  })
+
+  it('reads button 1 values above the threshold as hit held', () => {
+    const source = new GamepadInputSource(0)
+
+    expect(
+      source.read([createGamepad({ hitButtonValue: 0.75 })]).hitHeld,
+    ).toBe(true)
+  })
+
+  it('keeps gamepad jump and hit buttons independent', () => {
+    const source = new GamepadInputSource(0)
+
+    expect(source.read([createGamepad({ buttonPressed: true })])).toMatchObject(
+      { jumpHeld: true, hitHeld: false },
+    )
+    expect(
+      source.read([createGamepad({ hitButtonPressed: true })]),
+    ).toMatchObject({ jumpHeld: false, hitHeld: true })
+  })
+
+  it('allows gamepad jump and hit to be held simultaneously', () => {
+    const source = new GamepadInputSource(0)
+
+    expect(
+      source.read([
+        createGamepad({ buttonPressed: true, hitButtonPressed: true }),
+      ]),
+    ).toMatchObject({ jumpHeld: true, hitHeld: true })
+  })
+
   it('applies the radial deadzone to stick input', () => {
     const source = new GamepadInputSource(0)
 
@@ -162,6 +234,7 @@ describe('GamepadInputSource', () => {
       deviceName: 'Gamepad',
       localMove: { lateral: 0, forward: 0 },
       jumpHeld: false,
+      hitHeld: false,
     })
   })
 })

@@ -30,6 +30,7 @@ export interface InputSourceState {
   deviceName: string
   localMove: LocalMoveInput
   jumpHeld: boolean
+  hitHeld: boolean
 }
 
 export interface LocalPlayerInputSnapshot {
@@ -42,4 +43,6 @@ export interface LocalPlayerInputSnapshot {
   worldMove: WorldMoveInput
   jumpHeld: boolean
   jumpPressed: boolean
+  hitHeld: boolean
+  hitPressed: boolean
 }
