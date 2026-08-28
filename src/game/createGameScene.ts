@@ -4,6 +4,9 @@ import { Color4 } from '@babylonjs/core/Maths/math.color'
 import { Vector3 } from '@babylonjs/core/Maths/math.vector'
 import type { TransformNode } from '@babylonjs/core/Meshes/transformNode'
 import { Scene } from '@babylonjs/core/scene'
+import { createVolleyball } from '@/game/ball/createVolleyball'
+import { INDOOR_BALL_SPAWN } from '@/game/ball/indoorBallSpawn'
+import { createInitialVolleyballState } from '@/game/ball/volleyballState'
 import { configureGameplayCameras } from '@/game/camera/configureGameplayCameras'
 import { createIndoorCourt } from '@/game/court/createIndoorCourt'
 import { createIndoorNet } from '@/game/net/createIndoorNet'
@@ -18,6 +21,7 @@ const PREVIEW_LOCAL_PLAYERS = INDOOR_PLAYER_SPAWNS.map(
 export interface GameSceneResult {
   scene: Scene
   playerRoots: ReadonlyMap<string, TransformNode>
+  ballRoot: TransformNode
 }
 
 export function createGameScene(engine: Engine): GameSceneResult {
@@ -37,7 +41,11 @@ export function createGameScene(engine: Engine): GameSceneResult {
   INDOOR_PLAYER_SPAWNS.forEach((player) => {
     playerRoots.set(player.playerId, createPlaceholderPlayer(scene, player))
   })
+  const initialBallState = createInitialVolleyballState(INDOOR_BALL_SPAWN)
+  const ballRoot = createVolleyball(scene, {
+    position: initialBallState.position,
+  })
   configureGameplayCameras(scene, PREVIEW_LOCAL_PLAYERS)
 
-  return { scene, playerRoots }
+  return { scene, playerRoots, ballRoot }
 }
