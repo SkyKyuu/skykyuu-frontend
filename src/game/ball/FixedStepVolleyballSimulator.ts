@@ -15,8 +15,13 @@ import {
 import {
   createPlayerBallContactEvent,
   isBallOverlappingPlayer,
+  type PlayerBallContactEvent,
   type PlayerBallContactTarget,
 } from '@/game/contact/playerBallContact'
+import {
+  applyPlayerContactResponse,
+  createPlayerBallContactResponseEvent,
+} from '@/game/contact/playerBallContactResponse'
 
 const STEP_COMPARISON_EPSILON = 1e-12
 
@@ -113,9 +118,29 @@ export class FixedStepVolleyballSimulator {
       }
 
       this.state = stepVolleyballFreeFlight(this.state, fixedStepSeconds)
-      events.push(
-        ...this.detectPlayerContacts(this.state, playerContactTargets),
+      const playerContacts = this.detectPlayerContacts(
+        this.state,
+        playerContactTargets,
       )
+      events.push(...playerContacts)
+
+      const respondingContact = playerContacts[0]
+
+      if (respondingContact) {
+        // Temporary sandbox priority: only the first new contact in the stable
+        // target order may respond during a fixed step.
+        this.state = applyPlayerContactResponse(
+          this.state,
+          respondingContact,
+        )
+        events.push(
+          createPlayerBallContactResponseEvent(
+            respondingContact,
+            this.state.velocity,
+          ),
+        )
+      }
+
       this.accumulatedSeconds -= fixedStepSeconds
       executedSteps += 1
       this.simulationStepCount += 1
@@ -131,11 +156,11 @@ export class FixedStepVolleyballSimulator {
   private detectPlayerContacts(
     ballState: VolleyballState,
     playerContactTargets: readonly PlayerBallContactTarget[],
-  ): BallSimulationEvent[] {
+  ): PlayerBallContactEvent[] {
     // F2.4 samples overlap at fixed-step states. Swept/continuous collision can
     // replace this detector later without changing the PLAYER_CONTACT contract.
     const currentContactIds = new Set<string>()
-    const events: BallSimulationEvent[] = []
+    const events: PlayerBallContactEvent[] = []
 
     for (const target of playerContactTargets) {
       if (!isBallOverlappingPlayer(ballState.position, target)) {
