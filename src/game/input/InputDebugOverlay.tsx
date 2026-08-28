@@ -71,6 +71,10 @@ export function InputDebugOverlay({ snapshots }: InputDebugOverlayProps) {
             <dd>{formatValue(snapshot.verticalVelocity)}</dd>
             <dt>Jump Held</dt>
             <dd>{snapshot.jumpHeld ? 'true' : 'false'}</dd>
+            <dt>Hit Held</dt>
+            <dd>{snapshot.hitHeld ? 'true' : 'false'}</dd>
+            <dt>Hit Pressed</dt>
+            <dd>{snapshot.hitPressed ? 'true' : 'false'}</dd>
           </dl>
         </section>
       ))}

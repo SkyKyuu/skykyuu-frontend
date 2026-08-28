@@ -35,12 +35,41 @@ function keyUp(code: string): void {
   window.dispatchEvent(new KeyboardEvent('keyup', { code, cancelable: true }))
 }
 
+function createGamepad({
+  hitHeld = false,
+  id = 'Test Gamepad',
+}: {
+  hitHeld?: boolean
+  id?: string
+} = {}): Gamepad {
+  return {
+    axes: [0, 0],
+    buttons: [
+      { pressed: false, touched: false, value: 0 },
+      { pressed: hitHeld, touched: hitHeld, value: hitHeld ? 1 : 0 },
+    ],
+    connected: true,
+    id,
+  } as unknown as Gamepad
+}
+
 afterEach(() => {
   manager?.dispose()
   manager = null
 })
 
 describe('LocalInputManager', () => {
+  it('creates an initially neutral hit snapshot', () => {
+    manager = new LocalInputManager([KEYBOARD_BINDING], {
+      keyboardTarget: window,
+    })
+
+    expect(manager.getSnapshots()[0]).toMatchObject({
+      hitHeld: false,
+      hitPressed: false,
+    })
+  })
+
   it('detects jumpPressed only on false-to-true transitions', () => {
     manager = new LocalInputManager([KEYBOARD_BINDING], {
       keyboardTarget: window,
@@ -73,6 +102,94 @@ describe('LocalInputManager', () => {
       jumpHeld: true,
       jumpPressed: true,
     })
+  })
+
+  it('detects hitPressed only on false-to-true transitions', () => {
+    manager = new LocalInputManager([KEYBOARD_BINDING], {
+      keyboardTarget: window,
+    })
+    manager.start()
+
+    expect(manager.update()[0]).toMatchObject({
+      hitHeld: false,
+      hitPressed: false,
+    })
+
+    keyDown('KeyE')
+    expect(manager.update()[0]).toMatchObject({
+      hitHeld: true,
+      hitPressed: true,
+    })
+    expect(manager.update()[0]).toMatchObject({
+      hitHeld: true,
+      hitPressed: false,
+    })
+
+    keyUp('KeyE')
+    expect(manager.update()[0]).toMatchObject({
+      hitHeld: false,
+      hitPressed: false,
+    })
+
+    keyDown('KeyE')
+    expect(manager.update()[0]).toMatchObject({
+      hitHeld: true,
+      hitPressed: true,
+    })
+  })
+
+  it('clears hit edge history on dispose', () => {
+    manager = new LocalInputManager([KEYBOARD_BINDING], {
+      keyboardTarget: window,
+    })
+    manager.start()
+    keyDown('KeyE')
+    expect(manager.update()[0].hitPressed).toBe(true)
+
+    manager.dispose()
+    manager.start()
+    keyDown('KeyE')
+
+    expect(manager.update()[0].hitPressed).toBe(true)
+  })
+
+  it('tracks hitPressed independently for each playerId', () => {
+    let firstPlayerHit = false
+    let secondPlayerHit = false
+    manager = new LocalInputManager(
+      [
+        {
+          playerId: 'player-1',
+          teamSide: 'A',
+          deviceKind: 'gamepad',
+          gamepadSlot: 0,
+        },
+        {
+          playerId: 'player-2',
+          teamSide: 'B',
+          deviceKind: 'gamepad',
+          gamepadSlot: 1,
+        },
+      ],
+      {
+        gamepadProvider: () => [
+          createGamepad({ hitHeld: firstPlayerHit, id: 'First Gamepad' }),
+          createGamepad({ hitHeld: secondPlayerHit, id: 'Second Gamepad' }),
+        ],
+      },
+    )
+
+    firstPlayerHit = true
+    expect(manager.update().map(({ hitPressed }) => hitPressed)).toEqual([
+      true,
+      false,
+    ])
+
+    secondPlayerHit = true
+    expect(manager.update().map(({ hitPressed }) => hitPressed)).toEqual([
+      false,
+      true,
+    ])
   })
 
   it('maps TEAM_B gamepad intent without coupling it to a camera', () => {
@@ -131,7 +248,10 @@ describe('LocalInputManager', () => {
     let connected = true
     const gamepad = {
       axes: [1, 0],
-      buttons: [{ pressed: true, touched: true, value: 1 }],
+      buttons: [
+        { pressed: true, touched: true, value: 1 },
+        { pressed: true, touched: true, value: 1 },
+      ],
       connected: true,
       id: 'Temporary Gamepad',
     } as unknown as Gamepad
@@ -147,7 +267,11 @@ describe('LocalInputManager', () => {
       { gamepadProvider: () => (connected ? [gamepad] : []) },
     )
 
-    expect(manager.update()[0].jumpHeld).toBe(true)
+    expect(manager.update()[0]).toMatchObject({
+      jumpHeld: true,
+      hitHeld: true,
+      hitPressed: true,
+    })
     connected = false
 
     expect(manager.update()[0]).toMatchObject({
@@ -156,6 +280,8 @@ describe('LocalInputManager', () => {
       worldMove: { worldX: 0, worldZ: 0 },
       jumpHeld: false,
       jumpPressed: false,
+      hitHeld: false,
+      hitPressed: false,
     })
   })
 })

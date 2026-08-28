@@ -23,6 +23,7 @@ function createNeutralSourceState(binding: LocalInputBinding): InputSourceState 
     deviceName: binding.deviceKind === 'keyboard' ? 'Keyboard' : 'Gamepad',
     localMove: { lateral: 0, forward: 0 },
     jumpHeld: false,
+    hitHeld: false,
   }
 }
 
@@ -31,6 +32,7 @@ export class LocalInputManager {
   private readonly keyboardSource: KeyboardInputSource | null
   private readonly gamepadSources = new Map<string, GamepadInputSource>()
   private readonly previousJumpHeld = new Map<string, boolean>()
+  private readonly previousHitHeld = new Map<string, boolean>()
   private snapshots: readonly LocalPlayerInputSnapshot[]
   private started = false
 
@@ -59,10 +61,16 @@ export class LocalInputManager {
         )
       }
       this.previousJumpHeld.set(binding.playerId, false)
+      this.previousHitHeld.set(binding.playerId, false)
     }
 
     this.snapshots = bindings.map((binding) =>
-      this.createSnapshot(binding, createNeutralSourceState(binding), false),
+      this.createSnapshot(
+        binding,
+        createNeutralSourceState(binding),
+        false,
+        false,
+      ),
     )
   }
 
@@ -94,9 +102,17 @@ export class LocalInputManager {
             createNeutralSourceState(binding))
       const wasJumpHeld = this.previousJumpHeld.get(binding.playerId) ?? false
       const jumpPressed = sourceState.jumpHeld && !wasJumpHeld
+      const wasHitHeld = this.previousHitHeld.get(binding.playerId) ?? false
+      const hitPressed = sourceState.hitHeld && !wasHitHeld
 
       this.previousJumpHeld.set(binding.playerId, sourceState.jumpHeld)
-      return this.createSnapshot(binding, sourceState, jumpPressed)
+      this.previousHitHeld.set(binding.playerId, sourceState.hitHeld)
+      return this.createSnapshot(
+        binding,
+        sourceState,
+        jumpPressed,
+        hitPressed,
+      )
     })
 
     return this.snapshots
@@ -109,6 +125,7 @@ export class LocalInputManager {
   dispose(): void {
     this.keyboardSource?.dispose()
     this.previousJumpHeld.clear()
+    this.previousHitHeld.clear()
     this.started = false
   }
 
@@ -116,6 +133,7 @@ export class LocalInputManager {
     binding: LocalInputBinding,
     sourceState: InputSourceState,
     jumpPressed: boolean,
+    hitPressed: boolean,
   ): LocalPlayerInputSnapshot {
     return {
       playerId: binding.playerId,
@@ -127,6 +145,8 @@ export class LocalInputManager {
       worldMove: localMoveToWorld(binding.teamSide, sourceState.localMove),
       jumpHeld: sourceState.jumpHeld,
       jumpPressed,
+      hitHeld: sourceState.hitHeld,
+      hitPressed,
     }
   }
 }

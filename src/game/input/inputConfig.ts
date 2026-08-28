@@ -8,5 +8,10 @@ export const LOCAL_INPUT_CONFIG = {
     left: 'KeyA',
     right: 'KeyD',
     jump: 'Space',
+    hit: 'KeyE',
+  },
+  gamepadButtons: {
+    jump: 0,
+    hit: 1,
   },
 } as const
