@@ -7,6 +7,10 @@ import {
 import type { BallGroundContactEvent } from '@/game/ball/ballGroundContact'
 import { FixedStepVolleyballSimulator } from '@/game/ball/FixedStepVolleyballSimulator'
 import { createPreviewVolleyballState } from '@/game/ball/previewVolleyballState'
+import type {
+  PlayerBallContactEvent,
+  PlayerBallContactTarget,
+} from '@/game/contact/playerBallContact'
 import { createGameScene } from '@/game/createGameScene'
 import {
   InputDebugOverlay,
@@ -58,6 +62,7 @@ function GameCanvas() {
     const movementController = new PlayerMovementController(movementTargets)
     let lastDebugUpdate = -Infinity
     let lastLanding: BallGroundContactEvent | null = null
+    let lastPlayerContact: PlayerBallContactEvent | null = null
     let resetPreviewOnNextFrame = false
 
     inputManager.start()
@@ -71,12 +76,27 @@ function GameCanvas() {
       const frameDeltaSeconds = engine.getDeltaTime() / 1000
 
       movementController.update(snapshots, frameDeltaSeconds)
-      const advanceResult = ballSimulator.advance(frameDeltaSeconds)
+      const playerContactTargets: PlayerBallContactTarget[] =
+        movementTargets.map(({ playerId, teamSide, position }) => ({
+          playerId,
+          teamSide,
+          position: {
+            x: position.x,
+            y: position.y,
+            z: position.z,
+          },
+        }))
+      const advanceResult = ballSimulator.advance(
+        frameDeltaSeconds,
+        playerContactTargets,
+      )
 
       for (const event of advanceResult.events) {
         if (event.type === 'GROUND_CONTACT') {
           lastLanding = event
           resetPreviewOnNextFrame = true
+        } else if (event.type === 'PLAYER_CONTACT') {
+          lastPlayerContact = event
         }
       }
 
@@ -123,6 +143,7 @@ function GameCanvas() {
           accumulatorSeconds: ballSimulator.accumulatorSeconds,
           totalSimulationSteps: ballSimulator.totalSimulationSteps,
           lastLanding,
+          lastPlayerContact,
         })
         lastDebugUpdate = performance.now()
       }
