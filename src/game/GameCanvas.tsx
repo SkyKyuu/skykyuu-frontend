@@ -1,5 +1,14 @@
 import { Engine } from '@babylonjs/core/Engines/engine'
 import { useEffect, useRef, useState } from 'react'
+import {
+  BallDebugOverlay,
+  type BallDebugSnapshot,
+} from '@/game/ball/BallDebugOverlay'
+import { FixedStepVolleyballSimulator } from '@/game/ball/FixedStepVolleyballSimulator'
+import {
+  createPreviewVolleyballState,
+  shouldRespawnPreviewVolleyball,
+} from '@/game/ball/previewVolleyballState'
 import { createGameScene } from '@/game/createGameScene'
 import {
   InputDebugOverlay,
@@ -21,6 +30,8 @@ function GameCanvas() {
   const [debugSnapshots, setDebugSnapshots] = useState<readonly PlayerDebugSnapshot[]>(
     [],
   )
+  const [ballDebugSnapshot, setBallDebugSnapshot] =
+    useState<BallDebugSnapshot | null>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -30,8 +41,11 @@ function GameCanvas() {
     }
 
     const engine = new Engine(canvas, true)
-    const { scene, playerRoots } = createGameScene(engine)
+    const { scene, playerRoots, ballRoot } = createGameScene(engine)
     const inputManager = new LocalInputManager(PREVIEW_INPUT_BINDINGS)
+    const ballSimulator = new FixedStepVolleyballSimulator(
+      createPreviewVolleyballState(),
+    )
     const movementTargets: PlayerMovementTarget[] = INDOOR_PLAYER_SPAWNS.map(
       ({ playerId, teamSide }) => {
         const playerRoot = playerRoots.get(playerId)
@@ -49,9 +63,24 @@ function GameCanvas() {
     inputManager.start()
     const renderScene = () => {
       const snapshots = inputManager.update()
-      const deltaSeconds = engine.getDeltaTime() / 1000
+      const frameDeltaSeconds = engine.getDeltaTime() / 1000
 
-      movementController.update(snapshots, deltaSeconds)
+      movementController.update(snapshots, frameDeltaSeconds)
+      ballSimulator.advance(frameDeltaSeconds)
+
+      let ballState = ballSimulator.getState()
+
+      if (shouldRespawnPreviewVolleyball(ballState)) {
+        ballSimulator.reset(createPreviewVolleyballState())
+        ballState = ballSimulator.getState()
+      }
+
+      ballRoot.position.set(
+        ballState.position.x,
+        ballState.position.y,
+        ballState.position.z,
+      )
+      scene.render()
 
       if (
         import.meta.env.DEV &&
@@ -81,10 +110,14 @@ function GameCanvas() {
               : []
           }),
         )
+        setBallDebugSnapshot({
+          position: { ...ballState.position },
+          velocity: { ...ballState.velocity },
+          accumulatorSeconds: ballSimulator.accumulatorSeconds,
+          totalSimulationSteps: ballSimulator.totalSimulationSteps,
+        })
         lastDebugUpdate = performance.now()
       }
-
-      scene.render()
     }
     const resizeEngine = () => {
       engine.resize()
@@ -111,6 +144,7 @@ function GameCanvas() {
         aria-label="SkyKyuu 3D scene"
       />
       <InputDebugOverlay snapshots={debugSnapshots} />
+      <BallDebugOverlay snapshot={ballDebugSnapshot} />
     </>
   )
 }

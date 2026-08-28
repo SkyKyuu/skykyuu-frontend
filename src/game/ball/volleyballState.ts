@@ -9,6 +9,21 @@ export interface VolleyballState {
   velocity: BallVector3
 }
 
+export function copyVolleyballState(state: VolleyballState): VolleyballState {
+  return {
+    position: {
+      x: state.position.x,
+      y: state.position.y,
+      z: state.position.z,
+    },
+    velocity: {
+      x: state.velocity.x,
+      y: state.velocity.y,
+      z: state.velocity.z,
+    },
+  }
+}
+
 export function createInitialVolleyballState(
   spawn: BallVector3,
 ): VolleyballState {
