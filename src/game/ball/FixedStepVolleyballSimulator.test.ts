@@ -3,7 +3,6 @@ import { FixedStepVolleyballSimulator } from '@/game/ball/FixedStepVolleyballSim
 import {
   createPreviewVolleyballState,
   PREVIEW_BALL_LAUNCH_VELOCITY,
-  shouldRespawnPreviewVolleyball,
 } from '@/game/ball/previewVolleyballState'
 import { INDOOR_BALL_SPAWN } from '@/game/ball/indoorBallSpawn'
 import { VOLLEYBALL_CONFIG } from '@/game/ball/volleyballConfig'
@@ -27,7 +26,7 @@ describe('FixedStepVolleyballSimulator', () => {
       createPreviewVolleyballState(),
     )
 
-    expect(simulator.advance(1 / 30)).toBe(2)
+    expect(simulator.advance(1 / 30).executedSteps).toBe(2)
   })
 
   it('alternates zero and one fixed step at 120 FPS', () => {
@@ -36,10 +35,10 @@ describe('FixedStepVolleyballSimulator', () => {
     )
 
     expect([
-      simulator.advance(1 / 120),
-      simulator.advance(1 / 120),
-      simulator.advance(1 / 120),
-      simulator.advance(1 / 120),
+      simulator.advance(1 / 120).executedSteps,
+      simulator.advance(1 / 120).executedSteps,
+      simulator.advance(1 / 120).executedSteps,
+      simulator.advance(1 / 120).executedSteps,
     ]).toEqual([0, 1, 0, 1])
   })
 
@@ -72,7 +71,10 @@ describe('FixedStepVolleyballSimulator', () => {
       const initialState = createPreviewVolleyballState()
       const simulator = new FixedStepVolleyballSimulator(initialState)
 
-      expect(simulator.advance(frameDeltaSeconds)).toBe(0)
+      expect(simulator.advance(frameDeltaSeconds)).toEqual({
+        executedSteps: 0,
+        events: [],
+      })
       expect(simulator.getState()).toEqual(initialState)
       expect(simulator.accumulatorSeconds).toBe(0)
       expect(simulator.totalSimulationSteps).toBe(0)
@@ -84,7 +86,7 @@ describe('FixedStepVolleyballSimulator', () => {
       createPreviewVolleyballState(),
     )
 
-    expect(simulator.advance(10)).toBe(6)
+    expect(simulator.advance(10).executedSteps).toBe(6)
     expect(simulator.totalSimulationSteps).toBe(6)
   })
 
@@ -93,7 +95,7 @@ describe('FixedStepVolleyballSimulator', () => {
       createPreviewVolleyballState(),
     )
 
-    expect(simulator.advance(1_000)).toBeLessThanOrEqual(
+    expect(simulator.advance(1_000).executedSteps).toBeLessThanOrEqual(
       VOLLEYBALL_SIMULATION_CONFIG.maxSubSteps,
     )
   })
@@ -151,16 +153,48 @@ describe('preview volleyball lifecycle', () => {
     expect(firstState.velocity).not.toBe(PREVIEW_BALL_LAUNCH_VELOCITY)
   })
 
-  it('respawns at or below the ball radius, but not above it', () => {
-    const state = createPreviewVolleyballState()
+  it('emits one landing event, keeps the impact state, and waits for reset', () => {
+    const simulator = new FixedStepVolleyballSimulator({
+      position: { x: 0, y: 0.11, z: 1 },
+      velocity: { x: 0, y: -1, z: 2 },
+    })
 
-    state.position.y = VOLLEYBALL_CONFIG.radius + 0.001
-    expect(shouldRespawnPreviewVolleyball(state)).toBe(false)
+    const result = simulator.advance(VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds)
 
-    state.position.y = VOLLEYBALL_CONFIG.radius
-    expect(shouldRespawnPreviewVolleyball(state)).toBe(true)
+    expect(result.events).toHaveLength(1)
+    expect(result.events[0]).toMatchObject({
+      type: 'GROUND_CONTACT',
+      courtResult: 'IN',
+      courtSide: 'B',
+      position: { x: 0, y: VOLLEYBALL_CONFIG.radius },
+    })
+    expect(result.events[0]?.velocity.y).toBeLessThan(0)
+    expect(simulator.getState().position.y).toBe(VOLLEYBALL_CONFIG.radius)
+    expect(simulator.advance(1)).toEqual({ executedSteps: 0, events: [] })
 
-    state.position.y = VOLLEYBALL_CONFIG.radius - 0.001
-    expect(shouldRespawnPreviewVolleyball(state)).toBe(true)
+    simulator.reset(createPreviewVolleyballState())
+    expect(simulator.advance(1 / 60).events).toEqual([])
+  })
+
+  it('lands the preview trajectory inside side B through simulation math', () => {
+    const simulator = new FixedStepVolleyballSimulator(
+      createPreviewVolleyballState(),
+    )
+    let landingEvent: ReturnType<
+      FixedStepVolleyballSimulator['advance']
+    >['events'][number] | null = null
+
+    for (let frame = 0; frame < 180 && !landingEvent; frame += 1) {
+      const result = simulator.advance(1 / 60)
+      landingEvent = result.events[0] ?? null
+    }
+
+    expect(landingEvent).toMatchObject({
+      type: 'GROUND_CONTACT',
+      courtResult: 'IN',
+      courtSide: 'B',
+      position: { x: 0, y: VOLLEYBALL_CONFIG.radius },
+    })
+    expect(landingEvent?.position.z).toBeGreaterThan(0)
   })
 })

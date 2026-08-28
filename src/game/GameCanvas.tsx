@@ -4,11 +4,9 @@ import {
   BallDebugOverlay,
   type BallDebugSnapshot,
 } from '@/game/ball/BallDebugOverlay'
+import type { BallGroundContactEvent } from '@/game/ball/ballGroundContact'
 import { FixedStepVolleyballSimulator } from '@/game/ball/FixedStepVolleyballSimulator'
-import {
-  createPreviewVolleyballState,
-  shouldRespawnPreviewVolleyball,
-} from '@/game/ball/previewVolleyballState'
+import { createPreviewVolleyballState } from '@/game/ball/previewVolleyballState'
 import { createGameScene } from '@/game/createGameScene'
 import {
   InputDebugOverlay,
@@ -59,21 +57,30 @@ function GameCanvas() {
     )
     const movementController = new PlayerMovementController(movementTargets)
     let lastDebugUpdate = -Infinity
+    let lastLanding: BallGroundContactEvent | null = null
+    let resetPreviewOnNextFrame = false
 
     inputManager.start()
     const renderScene = () => {
+      if (resetPreviewOnNextFrame) {
+        ballSimulator.reset(createPreviewVolleyballState())
+        resetPreviewOnNextFrame = false
+      }
+
       const snapshots = inputManager.update()
       const frameDeltaSeconds = engine.getDeltaTime() / 1000
 
       movementController.update(snapshots, frameDeltaSeconds)
-      ballSimulator.advance(frameDeltaSeconds)
+      const advanceResult = ballSimulator.advance(frameDeltaSeconds)
 
-      let ballState = ballSimulator.getState()
-
-      if (shouldRespawnPreviewVolleyball(ballState)) {
-        ballSimulator.reset(createPreviewVolleyballState())
-        ballState = ballSimulator.getState()
+      for (const event of advanceResult.events) {
+        if (event.type === 'GROUND_CONTACT') {
+          lastLanding = event
+          resetPreviewOnNextFrame = true
+        }
       }
+
+      const ballState = ballSimulator.getState()
 
       ballRoot.position.set(
         ballState.position.x,
@@ -115,6 +122,7 @@ function GameCanvas() {
           velocity: { ...ballState.velocity },
           accumulatorSeconds: ballSimulator.accumulatorSeconds,
           totalSimulationSteps: ballSimulator.totalSimulationSteps,
+          lastLanding,
         })
         lastDebugUpdate = performance.now()
       }
