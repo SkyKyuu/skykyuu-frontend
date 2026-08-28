@@ -2,6 +2,7 @@ import type { BallVector3 } from '@/game/ball/volleyballState'
 import type { BallGroundContactEvent } from '@/game/ball/ballGroundContact'
 import { VOLLEYBALL_SIMULATION_CONFIG } from '@/game/ball/volleyballSimulationConfig'
 import type { PlayerBallContactEvent } from '@/game/contact/playerBallContact'
+import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallContactResponse'
 
 interface BallDebugOverlayProps {
   snapshot: BallDebugSnapshot | null
@@ -14,6 +15,7 @@ export interface BallDebugSnapshot {
   totalSimulationSteps: number
   lastLanding: BallGroundContactEvent | null
   lastPlayerContact: PlayerBallContactEvent | null
+  lastContactResponse: PlayerBallContactResponseEvent | null
 }
 
 function formatValue(value: number): string {
@@ -87,6 +89,29 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
           <dd>{formatValue(snapshot.lastPlayerContact.ballPosition.z)}</dd>
           <dt>Ball Vy</dt>
           <dd>{formatValue(snapshot.lastPlayerContact.ballVelocity.y)}</dd>
+        </dl>
+      ) : null}
+      {snapshot.lastContactResponse ? (
+        <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 border-t border-slate-700 pt-2">
+          <dt className="col-span-2 font-semibold text-emerald-300">
+            Last Contact Response
+          </dt>
+          <dt>Player ID</dt>
+          <dd>{snapshot.lastContactResponse.playerId}</dd>
+          <dt>Team</dt>
+          <dd>{snapshot.lastContactResponse.teamSide}</dd>
+          <dt>Incoming Vx</dt>
+          <dd>{formatValue(snapshot.lastContactResponse.incomingVelocity.x)}</dd>
+          <dt>Incoming Vy</dt>
+          <dd>{formatValue(snapshot.lastContactResponse.incomingVelocity.y)}</dd>
+          <dt>Incoming Vz</dt>
+          <dd>{formatValue(snapshot.lastContactResponse.incomingVelocity.z)}</dd>
+          <dt>Outgoing Vx</dt>
+          <dd>{formatValue(snapshot.lastContactResponse.outgoingVelocity.x)}</dd>
+          <dt>Outgoing Vy</dt>
+          <dd>{formatValue(snapshot.lastContactResponse.outgoingVelocity.y)}</dd>
+          <dt>Outgoing Vz</dt>
+          <dd>{formatValue(snapshot.lastContactResponse.outgoingVelocity.z)}</dd>
         </dl>
       ) : null}
     </aside>

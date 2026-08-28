@@ -1,6 +1,7 @@
 import { INDOOR_COURT } from '@/game/court/indoorCourtDimensions'
 import type { BallVector3 } from '@/game/ball/volleyballState'
 import type { PlayerBallContactEvent } from '@/game/contact/playerBallContact'
+import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallContactResponse'
 
 export type CourtResult = 'IN' | 'OUT'
 export type CourtSide = 'A' | 'B' | 'CENTER'
@@ -16,6 +17,7 @@ export interface BallGroundContactEvent {
 export type BallSimulationEvent =
   | BallGroundContactEvent
   | PlayerBallContactEvent
+  | PlayerBallContactResponseEvent
 
 export function classifyIndoorCourtResult(position: BallVector3): CourtResult {
   return Math.abs(position.x) <= INDOOR_COURT.halfWidth &&

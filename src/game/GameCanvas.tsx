@@ -11,6 +11,7 @@ import type {
   PlayerBallContactEvent,
   PlayerBallContactTarget,
 } from '@/game/contact/playerBallContact'
+import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallContactResponse'
 import { createGameScene } from '@/game/createGameScene'
 import {
   InputDebugOverlay,
@@ -63,6 +64,7 @@ function GameCanvas() {
     let lastDebugUpdate = -Infinity
     let lastLanding: BallGroundContactEvent | null = null
     let lastPlayerContact: PlayerBallContactEvent | null = null
+    let lastContactResponse: PlayerBallContactResponseEvent | null = null
     let resetPreviewOnNextFrame = false
 
     inputManager.start()
@@ -97,6 +99,8 @@ function GameCanvas() {
           resetPreviewOnNextFrame = true
         } else if (event.type === 'PLAYER_CONTACT') {
           lastPlayerContact = event
+        } else if (event.type === 'PLAYER_CONTACT_RESPONSE') {
+          lastContactResponse = event
         }
       }
 
@@ -144,6 +148,7 @@ function GameCanvas() {
           totalSimulationSteps: ballSimulator.totalSimulationSteps,
           lastLanding,
           lastPlayerContact,
+          lastContactResponse,
         })
         lastDebugUpdate = performance.now()
       }
