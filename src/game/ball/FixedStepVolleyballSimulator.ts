@@ -22,12 +22,18 @@ import {
   applyPlayerContactResponse,
   createPlayerBallContactResponseEvent,
 } from '@/game/contact/playerBallContactResponse'
+import type { PlayerHitIntent } from '@/game/contact/playerHitIntent'
 
 const STEP_COMPARISON_EPSILON = 1e-12
 
 export interface BallSimulationAdvanceResult {
   executedSteps: number
   events: readonly BallSimulationEvent[]
+}
+
+interface PlayerContactDetectionResult {
+  overlappingTargets: readonly PlayerBallContactTarget[]
+  newContactEvents: readonly PlayerBallContactEvent[]
 }
 
 function getSafeFrameDeltaSeconds(frameDeltaSeconds: number): number {
@@ -47,6 +53,7 @@ export class FixedStepVolleyballSimulator {
   private simulationStepCount = 0
   private groundContactOccurred = false
   private activePlayerContactIds = new Set<string>()
+  private respondedPlayerContactIds = new Set<string>()
 
   constructor(initialState: VolleyballState) {
     this.state = copyVolleyballState(initialState)
@@ -67,6 +74,7 @@ export class FixedStepVolleyballSimulator {
   advance(
     frameDeltaSeconds: number,
     playerContactTargets: readonly PlayerBallContactTarget[] = [],
+    playerHitIntents: readonly PlayerHitIntent[] = [],
   ): BallSimulationAdvanceResult {
     const safeFrameDeltaSeconds = getSafeFrameDeltaSeconds(frameDeltaSeconds)
 
@@ -98,12 +106,11 @@ export class FixedStepVolleyballSimulator {
         const stateAtImpact = stepVolleyballFreeFlight(this.state, contactTime)
         stateAtImpact.position.y = VOLLEYBALL_CONFIG.radius
         this.state = stateAtImpact
-        events.push(
-          ...this.detectPlayerContacts(
-            stateAtImpact,
-            playerContactTargets,
-          ),
+        const { newContactEvents } = this.detectPlayerContacts(
+          stateAtImpact,
+          playerContactTargets,
         )
+        events.push(...newContactEvents)
         events.push(
           createBallGroundContactEvent(
             stateAtImpact.position,
@@ -118,21 +125,31 @@ export class FixedStepVolleyballSimulator {
       }
 
       this.state = stepVolleyballFreeFlight(this.state, fixedStepSeconds)
-      const playerContacts = this.detectPlayerContacts(
-        this.state,
-        playerContactTargets,
-      )
-      events.push(...playerContacts)
+      const { overlappingTargets, newContactEvents } =
+        this.detectPlayerContacts(this.state, playerContactTargets)
+      events.push(...newContactEvents)
 
-      const respondingContact = playerContacts[0]
+      const respondingTarget = overlappingTargets.find((target) => {
+        const intent = playerHitIntents.find(
+          ({ playerId }) => playerId === target.playerId,
+        )
 
-      if (respondingContact) {
-        // Temporary sandbox priority: only the first new contact in the stable
-        // target order may respond during a fixed step.
+        return (
+          intent?.hitPressed === true &&
+          !this.respondedPlayerContactIds.has(target.playerId)
+        )
+      })
+
+      if (respondingTarget) {
+        const respondingContact = createPlayerBallContactEvent(
+          this.state,
+          respondingTarget,
+        )
         this.state = applyPlayerContactResponse(
           this.state,
           respondingContact,
         )
+        this.respondedPlayerContactIds.add(respondingTarget.playerId)
         events.push(
           createPlayerBallContactResponseEvent(
             respondingContact,
@@ -156,10 +173,11 @@ export class FixedStepVolleyballSimulator {
   private detectPlayerContacts(
     ballState: VolleyballState,
     playerContactTargets: readonly PlayerBallContactTarget[],
-  ): PlayerBallContactEvent[] {
+  ): PlayerContactDetectionResult {
     // F2.4 samples overlap at fixed-step states. Swept/continuous collision can
     // replace this detector later without changing the PLAYER_CONTACT contract.
     const currentContactIds = new Set<string>()
+    const overlappingTargets: PlayerBallContactTarget[] = []
     const events: PlayerBallContactEvent[] = []
 
     for (const target of playerContactTargets) {
@@ -168,15 +186,22 @@ export class FixedStepVolleyballSimulator {
       }
 
       currentContactIds.add(target.playerId)
+      overlappingTargets.push(target)
 
       if (!this.activePlayerContactIds.has(target.playerId)) {
         events.push(createPlayerBallContactEvent(ballState, target))
       }
     }
 
+    for (const respondedPlayerId of this.respondedPlayerContactIds) {
+      if (!currentContactIds.has(respondedPlayerId)) {
+        this.respondedPlayerContactIds.delete(respondedPlayerId)
+      }
+    }
+
     this.activePlayerContactIds = currentContactIds
 
-    return events
+    return { overlappingTargets, newContactEvents: events }
   }
 
   reset(state: VolleyballState): void {
@@ -185,5 +210,6 @@ export class FixedStepVolleyballSimulator {
     this.simulationStepCount = 0
     this.groundContactOccurred = false
     this.activePlayerContactIds.clear()
+    this.respondedPlayerContactIds.clear()
   }
 }

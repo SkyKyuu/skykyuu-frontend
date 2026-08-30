@@ -12,6 +12,7 @@ import type {
   PlayerBallContactTarget,
 } from '@/game/contact/playerBallContact'
 import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallContactResponse'
+import type { PlayerHitIntent } from '@/game/contact/playerHitIntent'
 import { createGameScene } from '@/game/createGameScene'
 import {
   InputDebugOverlay,
@@ -26,7 +27,9 @@ import {
 } from '@/game/movement/PlayerMovementController'
 import { INDOOR_PLAYER_SPAWNS } from '@/game/player/indoorPlayerSpawns'
 
-const PREVIEW_INPUT_BINDINGS = createPreviewInputBindings(INDOOR_PLAYER_SPAWNS)
+const PREVIEW_INPUT_BINDINGS = createPreviewInputBindings([
+  ...INDOOR_PLAYER_SPAWNS,
+].reverse())
 
 function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -75,6 +78,13 @@ function GameCanvas() {
       }
 
       const snapshots = inputManager.update()
+      const playerHitIntents: PlayerHitIntent[] = snapshots.map(
+        ({ playerId, hitHeld, hitPressed }) => ({
+          playerId,
+          hitHeld,
+          hitPressed,
+        }),
+      )
       const frameDeltaSeconds = engine.getDeltaTime() / 1000
 
       movementController.update(snapshots, frameDeltaSeconds)
@@ -91,6 +101,7 @@ function GameCanvas() {
       const advanceResult = ballSimulator.advance(
         frameDeltaSeconds,
         playerContactTargets,
+        playerHitIntents,
       )
 
       for (const event of advanceResult.events) {
