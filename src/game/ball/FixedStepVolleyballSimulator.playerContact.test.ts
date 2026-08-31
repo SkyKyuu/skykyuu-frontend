@@ -7,6 +7,7 @@ import { stepVolleyballFreeFlight } from '@/game/ball/volleyballSimulationMath'
 import type { BallSimulationEvent } from '@/game/ball/ballGroundContact'
 import type { PlayerBallContactTarget } from '@/game/contact/playerBallContact'
 import { PLAYER_CONTACT_RESPONSE_CONFIG } from '@/game/contact/playerBallContactResponseConfig'
+import type { PlayerHitIntent } from '@/game/contact/playerHitIntent'
 
 const FIXED_STEP = VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds
 
@@ -23,14 +24,22 @@ function createTarget(
   }
 }
 
+function createHitIntent(playerId: string): PlayerHitIntent {
+  return { playerId, hitHeld: true, hitPressed: true }
+}
+
 describe('FixedStepVolleyballSimulator player contact integration', () => {
-  it('detects and responds in fixed substeps only on overlap entry', () => {
+  it('detects and responds to a hit in fixed substeps on overlap entry', () => {
     const simulator = new FixedStepVolleyballSimulator({
       position: { x: 0, y: 1, z: 0 },
       velocity: { x: 0, y: 0, z: 0 },
     })
 
-    const result = simulator.advance(1 / 30, [createTarget('player-b')])
+    const result = simulator.advance(
+      1 / 30,
+      [createTarget('player-b')],
+      [createHitIntent('player-b')],
+    )
 
     expect(result.executedSteps).toBe(2)
     expect(result.events).toHaveLength(2)
@@ -52,7 +61,11 @@ describe('FixedStepVolleyballSimulator player contact integration', () => {
     }
     const simulator = new FixedStepVolleyballSimulator(initialState)
 
-    const result = simulator.advance(FIXED_STEP, [createTarget('player-b')])
+    const result = simulator.advance(
+      FIXED_STEP,
+      [createTarget('player-b')],
+      [createHitIntent('player-b')],
+    )
     const freeFlightState = stepVolleyballFreeFlight(initialState, FIXED_STEP)
 
     expect(result.events[0]?.type).toBe('PLAYER_CONTACT')
@@ -77,9 +90,17 @@ describe('FixedStepVolleyballSimulator player contact integration', () => {
     const nearTarget = createTarget('player-b')
     const farTarget = createTarget('player-b', 10)
 
-    const firstEntry = simulator.advance(FIXED_STEP, [nearTarget])
+    const firstEntry = simulator.advance(
+      FIXED_STEP,
+      [nearTarget],
+      [createHitIntent('player-b')],
+    )
     const leave = simulator.advance(FIXED_STEP, [farTarget])
-    const secondEntry = simulator.advance(FIXED_STEP, [nearTarget])
+    const secondEntry = simulator.advance(
+      FIXED_STEP,
+      [nearTarget],
+      [createHitIntent('player-b')],
+    )
 
     expect(firstEntry.events).toHaveLength(2)
     expect(leave.events).toHaveLength(0)
@@ -95,7 +116,7 @@ describe('FixedStepVolleyballSimulator player contact integration', () => {
     const result = simulator.advance(FIXED_STEP, [
       createTarget('far-player', 10),
       createTarget('near-player'),
-    ])
+    ], [createHitIntent('near-player')])
 
     expect(result.events).toHaveLength(2)
     expect(result.events[0]).toMatchObject({
@@ -116,9 +137,21 @@ describe('FixedStepVolleyballSimulator player contact integration', () => {
     const target = createTarget('player-b')
     const simulator = new FixedStepVolleyballSimulator(initialState)
 
-    expect(simulator.advance(FIXED_STEP, [target]).events).toHaveLength(2)
+    expect(
+      simulator.advance(
+        FIXED_STEP,
+        [target],
+        [createHitIntent('player-b')],
+      ).events,
+    ).toHaveLength(2)
     simulator.reset(initialState)
-    expect(simulator.advance(FIXED_STEP, [target]).events).toHaveLength(2)
+    expect(
+      simulator.advance(
+        FIXED_STEP,
+        [target],
+        [createHitIntent('player-b')],
+      ).events,
+    ).toHaveLength(2)
   })
 
   it('preserves F2.3 ground contact with no player targets', () => {
@@ -138,7 +171,7 @@ describe('FixedStepVolleyballSimulator player contact integration', () => {
     })
   })
 
-  it('responds to preview Team B contact before its IN side-A landing', () => {
+  it('responds to a preview Team B hit before its IN side-A landing', () => {
     const simulator = new FixedStepVolleyballSimulator(
       createPreviewVolleyballState(),
     )
@@ -146,7 +179,11 @@ describe('FixedStepVolleyballSimulator player contact integration', () => {
     const observedEvents: BallSimulationEvent[] = []
 
     for (let frame = 0; frame < 180; frame += 1) {
-      const result = simulator.advance(1 / 60, [teamBTarget])
+      const result = simulator.advance(
+        1 / 60,
+        [teamBTarget],
+        [createHitIntent('team-b-player')],
+      )
       observedEvents.push(...result.events)
 
       if (result.events.some((event) => event.type === 'GROUND_CONTACT')) {
