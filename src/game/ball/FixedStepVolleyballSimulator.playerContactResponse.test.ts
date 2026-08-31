@@ -33,6 +33,18 @@ function createIntent(
   return { playerId, hitHeld, hitPressed }
 }
 
+function getResponseEvent(events: readonly BallSimulationEvent[]) {
+  const response = events.find(
+    (event) => event.type === 'PLAYER_CONTACT_RESPONSE',
+  )
+
+  if (!response || response.type !== 'PLAYER_CONTACT_RESPONSE') {
+    throw new Error('Expected PLAYER_CONTACT_RESPONSE event')
+  }
+
+  return response
+}
+
 describe('FixedStepVolleyballSimulator hit-gated player contact response', () => {
   it('emits a new contact without response and preserves free flight when no hit is pressed', () => {
     const initialState = {
@@ -89,6 +101,8 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
         y: PLAYER_CONTACT_RESPONSE_CONFIG.upwardVelocity,
         z: -PLAYER_CONTACT_RESPONSE_CONFIG.forwardVelocity,
       },
+      hitTimingOffsetSteps: 0,
+      hitTimingOffsetSeconds: 0,
     })
   })
 
@@ -172,6 +186,8 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
         y: PLAYER_CONTACT_RESPONSE_CONFIG.upwardVelocity,
         z: -PLAYER_CONTACT_RESPONSE_CONFIG.forwardVelocity,
       },
+      hitTimingOffsetSteps: 1,
+      hitTimingOffsetSeconds: FIXED_STEP,
     })
   })
 
@@ -191,11 +207,16 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       [farTarget],
       [createIntent('player-b')],
     )
-    expect(
-      simulator.advance(FIXED_STEP, [nearTarget]).events.map(
-        (event) => event.type,
-      ),
-    ).toEqual(['PLAYER_CONTACT', 'PLAYER_CONTACT_RESPONSE'])
+    const secondResponse = simulator.advance(FIXED_STEP, [nearTarget])
+
+    expect(secondResponse.events.map((event) => event.type)).toEqual([
+      'PLAYER_CONTACT',
+      'PLAYER_CONTACT_RESPONSE',
+    ])
+    expect(getResponseEvent(secondResponse.events)).toMatchObject({
+      hitTimingOffsetSteps: -1,
+      hitTimingOffsetSeconds: -FIXED_STEP,
+    })
 
     simulator.advance(FIXED_STEP, [farTarget])
 
@@ -299,11 +320,16 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(
       simulator.advance(FIXED_STEP, [farTarget], [intent]).events,
     ).toEqual([])
-    expect(
-      simulator.advance(FIXED_STEP, [nearTarget]).events.map(
-        (event) => event.type,
-      ),
-    ).toEqual(['PLAYER_CONTACT', 'PLAYER_CONTACT_RESPONSE'])
+    const reentryResponse = simulator.advance(FIXED_STEP, [nearTarget])
+
+    expect(reentryResponse.events.map((event) => event.type)).toEqual([
+      'PLAYER_CONTACT',
+      'PLAYER_CONTACT_RESPONSE',
+    ])
+    expect(getResponseEvent(reentryResponse.events)).toMatchObject({
+      hitTimingOffsetSteps: -1,
+      hitTimingOffsetSeconds: -FIXED_STEP,
+    })
   })
 
   it('buffers a hit pressed one fixed step before overlap', () => {
@@ -338,6 +364,8 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(responseResult.events[1]).toMatchObject({
       ballPosition: expectedIncomingState.position,
       incomingVelocity: expectedIncomingState.velocity,
+      hitTimingOffsetSteps: -1,
+      hitTimingOffsetSeconds: -FIXED_STEP,
     })
   })
 
@@ -360,11 +388,16 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     simulator.advance(FIXED_STEP, [farTarget])
     simulator.advance(FIXED_STEP, [farTarget])
 
-    expect(
-      simulator.advance(FIXED_STEP, [nearTarget]).events.map(
-        (event) => event.type,
-      ),
-    ).toEqual(['PLAYER_CONTACT', 'PLAYER_CONTACT_RESPONSE'])
+    const responseResult = simulator.advance(FIXED_STEP, [nearTarget])
+
+    expect(responseResult.events.map((event) => event.type)).toEqual([
+      'PLAYER_CONTACT',
+      'PLAYER_CONTACT_RESPONSE',
+    ])
+    expect(responseResult.events[1]).toMatchObject({
+      hitTimingOffsetSteps: -3,
+      hitTimingOffsetSeconds: -3 * FIXED_STEP,
+    })
   })
 
   it('accepts overlap on the sixth fixed step at the deterministic limit', () => {
@@ -390,11 +423,16 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       simulator.advance(FIXED_STEP, [farTarget])
     }
 
-    expect(
-      simulator.advance(FIXED_STEP, [nearTarget]).events.map(
-        (event) => event.type,
-      ),
-    ).toEqual(['PLAYER_CONTACT', 'PLAYER_CONTACT_RESPONSE'])
+    const responseResult = simulator.advance(FIXED_STEP, [nearTarget])
+
+    expect(responseResult.events.map((event) => event.type)).toEqual([
+      'PLAYER_CONTACT',
+      'PLAYER_CONTACT_RESPONSE',
+    ])
+    expect(responseResult.events[1]).toMatchObject({
+      hitTimingOffsetSteps: -5,
+      hitTimingOffsetSeconds: -5 * FIXED_STEP,
+    })
   })
 
   it('expires the buffer before overlap on the seventh fixed step', () => {
@@ -468,11 +506,16 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(
       simulator.advance(delta, [target], [createIntent('player-b')]),
     ).toEqual({ executedSteps: 0, events: [] })
-    expect(
-      simulator.advance(FIXED_STEP, [target]).events.map(
-        (event) => event.type,
-      ),
-    ).toEqual(['PLAYER_CONTACT', 'PLAYER_CONTACT_RESPONSE'])
+    const responseResult = simulator.advance(FIXED_STEP, [target])
+
+    expect(responseResult.events.map((event) => event.type)).toEqual([
+      'PLAYER_CONTACT',
+      'PLAYER_CONTACT_RESPONSE',
+    ])
+    expect(responseResult.events[1]).toMatchObject({
+      hitTimingOffsetSteps: 0,
+      hitTimingOffsetSeconds: 0,
+    })
   })
 
   it('clears buffered hits on reset', () => {
@@ -517,11 +560,19 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     })
     const firstTarget = createTarget('first-player', 'A')
     const secondTarget = createTarget('second-player', 'B')
+    const farTargets = [firstTarget, secondTarget].map((target) => ({
+      ...target,
+      position: { ...target.position, x: 10 },
+    }))
+
+    simulator.advance(FIXED_STEP, farTargets, [
+      createIntent('second-player'),
+    ])
 
     const result = simulator.advance(
       FIXED_STEP,
       [firstTarget, secondTarget],
-      [createIntent('second-player'), createIntent('first-player')],
+      [createIntent('first-player')],
     )
 
     expect(result.events.map((event) => event.type)).toEqual([
@@ -533,10 +584,82 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(result.events[1]).toMatchObject({ playerId: 'second-player' })
     expect(result.events[2]).toMatchObject({
       playerId: 'first-player',
+      hitTimingOffsetSteps: 0,
+      hitTimingOffsetSeconds: 0,
       outgoingVelocity: {
         z: PLAYER_CONTACT_RESPONSE_CONFIG.forwardVelocity,
       },
     })
+
+    const secondResult = simulator.advance(FIXED_STEP, [
+      firstTarget,
+      secondTarget,
+    ])
+
+    expect(secondResult.events.map((event) => event.type)).toEqual([
+      'PLAYER_CONTACT_RESPONSE',
+    ])
+    expect(getResponseEvent(secondResult.events)).toMatchObject({
+      playerId: 'second-player',
+      hitTimingOffsetSteps: -1,
+      hitTimingOffsetSeconds: -FIXED_STEP,
+    })
+  })
+
+  it('keeps response physics identical for negative, zero, and positive offsets', () => {
+    const initialState = {
+      position: { x: 0, y: 1, z: 0 },
+      velocity: { x: 0.25, y: 0.5, z: 0.75 },
+    }
+    const nearTarget = createTarget('player-b', 'B')
+    const farTarget = {
+      ...nearTarget,
+      position: { x: 10, y: 0, z: 0 },
+    }
+
+    const earlySimulator = new FixedStepVolleyballSimulator(initialState)
+    earlySimulator.advance(
+      FIXED_STEP,
+      [farTarget],
+      [createIntent('player-b')],
+    )
+    const earlyResponse = getResponseEvent(
+      earlySimulator.advance(FIXED_STEP, [nearTarget]).events,
+    )
+
+    const sameStepSimulator = new FixedStepVolleyballSimulator(initialState)
+    const sameStepResponse = getResponseEvent(
+      sameStepSimulator.advance(
+        FIXED_STEP,
+        [nearTarget],
+        [createIntent('player-b')],
+      ).events,
+    )
+
+    const lateSimulator = new FixedStepVolleyballSimulator(initialState)
+    lateSimulator.advance(FIXED_STEP, [nearTarget])
+    const lateResponse = getResponseEvent(
+      lateSimulator.advance(
+        FIXED_STEP,
+        [nearTarget],
+        [createIntent('player-b')],
+      ).events,
+    )
+
+    expect([
+      earlyResponse.hitTimingOffsetSteps,
+      sameStepResponse.hitTimingOffsetSteps,
+      lateResponse.hitTimingOffsetSteps,
+    ]).toEqual([-1, 0, 1])
+    expect([
+      earlyResponse.outgoingVelocity,
+      sameStepResponse.outgoingVelocity,
+      lateResponse.outgoingVelocity,
+    ]).toEqual([
+      { x: 0.25, y: 6.3, z: -5 },
+      { x: 0.25, y: 6.3, z: -5 },
+      { x: 0.25, y: 6.3, z: -5 },
+    ])
   })
 
   it('keeps ground contact terminal even with an active buffered hit at impact', () => {
@@ -637,6 +760,8 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(observedEvents[1]).toMatchObject({
       type: 'PLAYER_CONTACT_RESPONSE',
       playerId: 'player-b',
+      hitTimingOffsetSteps: -3,
+      hitTimingOffsetSeconds: -3 * FIXED_STEP,
       outgoingVelocity: {
         y: PLAYER_CONTACT_RESPONSE_CONFIG.upwardVelocity,
         z: -PLAYER_CONTACT_RESPONSE_CONFIG.forwardVelocity,

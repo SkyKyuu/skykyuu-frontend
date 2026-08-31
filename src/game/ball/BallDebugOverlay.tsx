@@ -22,6 +22,12 @@ function formatValue(value: number): string {
   return Math.abs(value) < 0.0005 ? '0.000' : value.toFixed(3)
 }
 
+function formatSignedValue(value: number, fractionDigits: number): string {
+  const formatted = value.toFixed(fractionDigits)
+
+  return value > 0 ? `+${formatted}` : formatted
+}
+
 export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
   if (!import.meta.env.DEV || !snapshot) {
     return null
@@ -100,6 +106,20 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
           <dd>{snapshot.lastContactResponse.playerId}</dd>
           <dt>Team</dt>
           <dd>{snapshot.lastContactResponse.teamSide}</dd>
+          <dt>Hit Offset Steps</dt>
+          <dd>
+            {formatSignedValue(
+              snapshot.lastContactResponse.hitTimingOffsetSteps,
+              0,
+            )}
+          </dd>
+          <dt>Hit Offset ms</dt>
+          <dd>
+            {formatSignedValue(
+              snapshot.lastContactResponse.hitTimingOffsetSeconds * 1_000,
+              3,
+            )}
+          </dd>
           <dt>Incoming Vx</dt>
           <dd>{formatValue(snapshot.lastContactResponse.incomingVelocity.x)}</dd>
           <dt>Incoming Vy</dt>

@@ -4,6 +4,7 @@ import type {
 } from '@/game/ball/volleyballState'
 import type { PlayerBallContactEvent } from '@/game/contact/playerBallContact'
 import { PLAYER_CONTACT_RESPONSE_CONFIG } from '@/game/contact/playerBallContactResponseConfig'
+import type { PlayerHitTimingSample } from '@/game/contact/playerHitTiming'
 import type { TeamSide } from '@/game/team/teamTypes'
 
 export interface PlayerBallContactResponseEvent {
@@ -13,6 +14,8 @@ export interface PlayerBallContactResponseEvent {
   ballPosition: BallVector3
   incomingVelocity: BallVector3
   outgoingVelocity: BallVector3
+  hitTimingOffsetSteps: number
+  hitTimingOffsetSeconds: number
 }
 
 export function getDefaultPlayerContactResponseVelocity(
@@ -45,6 +48,7 @@ export function applyPlayerContactResponse(
 export function createPlayerBallContactResponseEvent(
   playerContact: PlayerBallContactEvent,
   outgoingVelocity: BallVector3,
+  hitTiming: PlayerHitTimingSample,
 ): PlayerBallContactResponseEvent {
   return {
     type: 'PLAYER_CONTACT_RESPONSE',
@@ -53,5 +57,7 @@ export function createPlayerBallContactResponseEvent(
     ballPosition: { ...playerContact.ballPosition },
     incomingVelocity: { ...playerContact.ballVelocity },
     outgoingVelocity: { ...outgoingVelocity },
+    hitTimingOffsetSteps: hitTiming.offsetSteps,
+    hitTimingOffsetSeconds: hitTiming.offsetSeconds,
   }
 }
