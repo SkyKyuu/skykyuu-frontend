@@ -24,6 +24,10 @@ import {
 } from '@/game/contact/playerBallContactResponse'
 import { PLAYER_HIT_BUFFER_CONFIG } from '@/game/contact/playerHitBufferConfig'
 import type { PlayerHitIntent } from '@/game/contact/playerHitIntent'
+import {
+  createPlayerHitTimingSample,
+  type PlayerHitTimingSample,
+} from '@/game/contact/playerHitTiming'
 
 const STEP_COMPARISON_EPSILON = 1e-12
 
@@ -56,6 +60,8 @@ export class FixedStepVolleyballSimulator {
   private activePlayerContactIds = new Set<string>()
   private respondedPlayerContactIds = new Set<string>()
   private hitBufferRemainingSecondsByPlayer = new Map<string, number>()
+  private hitPressStepByPlayer = new Map<string, number>()
+  private contactEntryStepByPlayer = new Map<string, number>()
 
   constructor(initialState: VolleyballState) {
     this.state = copyVolleyballState(initialState)
@@ -147,6 +153,10 @@ export class FixedStepVolleyballSimulator {
       })
 
       if (respondingTarget) {
+        const hitTiming = this.createResponseHitTiming(
+          respondingTarget.playerId,
+          fixedStepSeconds,
+        )
         const respondingContact = createPlayerBallContactEvent(
           this.state,
           respondingTarget,
@@ -159,10 +169,12 @@ export class FixedStepVolleyballSimulator {
         this.hitBufferRemainingSecondsByPlayer.delete(
           respondingTarget.playerId,
         )
+        this.hitPressStepByPlayer.delete(respondingTarget.playerId)
         events.push(
           createPlayerBallContactResponseEvent(
             respondingContact,
             this.state.velocity,
+            hitTiming,
           ),
         )
       }
@@ -195,12 +207,17 @@ export class FixedStepVolleyballSimulator {
 
       if (isConsumedOverlap) {
         this.hitBufferRemainingSecondsByPlayer.delete(intent.playerId)
+        this.hitPressStepByPlayer.delete(intent.playerId)
         continue
       }
 
       this.hitBufferRemainingSecondsByPlayer.set(
         intent.playerId,
         PLAYER_HIT_BUFFER_CONFIG.durationSeconds,
+      )
+      this.hitPressStepByPlayer.set(
+        intent.playerId,
+        this.simulationStepCount,
       )
     }
   }
@@ -211,6 +228,7 @@ export class FixedStepVolleyballSimulator {
     for (const target of overlappingTargets) {
       if (this.respondedPlayerContactIds.has(target.playerId)) {
         this.hitBufferRemainingSecondsByPlayer.delete(target.playerId)
+        this.hitPressStepByPlayer.delete(target.playerId)
       }
     }
   }
@@ -222,6 +240,7 @@ export class FixedStepVolleyballSimulator {
 
       if (nextRemainingSeconds <= STEP_COMPARISON_EPSILON) {
         this.hitBufferRemainingSecondsByPlayer.delete(playerId)
+        this.hitPressStepByPlayer.delete(playerId)
       } else {
         this.hitBufferRemainingSecondsByPlayer.set(
           playerId,
@@ -251,6 +270,16 @@ export class FixedStepVolleyballSimulator {
 
       if (!this.activePlayerContactIds.has(target.playerId)) {
         events.push(createPlayerBallContactEvent(ballState, target))
+        this.contactEntryStepByPlayer.set(
+          target.playerId,
+          this.simulationStepCount,
+        )
+      }
+    }
+
+    for (const activePlayerId of this.activePlayerContactIds) {
+      if (!currentContactIds.has(activePlayerId)) {
+        this.contactEntryStepByPlayer.delete(activePlayerId)
       }
     }
 
@@ -265,6 +294,26 @@ export class FixedStepVolleyballSimulator {
     return { overlappingTargets, newContactEvents: events }
   }
 
+  private createResponseHitTiming(
+    playerId: string,
+    fixedStepSeconds: number,
+  ): PlayerHitTimingSample {
+    const pressStep = this.hitPressStepByPlayer.get(playerId)
+    const contactEntryStep = this.contactEntryStepByPlayer.get(playerId)
+
+    if (pressStep === undefined || contactEntryStep === undefined) {
+      throw new Error(
+        `Missing hit timing state for eligible player: ${playerId}`,
+      )
+    }
+
+    return createPlayerHitTimingSample(
+      pressStep,
+      contactEntryStep,
+      fixedStepSeconds,
+    )
+  }
+
   reset(state: VolleyballState): void {
     this.state = copyVolleyballState(state)
     this.accumulatedSeconds = 0
@@ -273,5 +322,7 @@ export class FixedStepVolleyballSimulator {
     this.activePlayerContactIds.clear()
     this.respondedPlayerContactIds.clear()
     this.hitBufferRemainingSecondsByPlayer.clear()
+    this.hitPressStepByPlayer.clear()
+    this.contactEntryStepByPlayer.clear()
   }
 }

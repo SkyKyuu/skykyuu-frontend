@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { VOLLEYBALL_SIMULATION_CONFIG } from '@/game/ball/volleyballSimulationConfig'
 import type { PlayerBallContactEvent } from '@/game/contact/playerBallContact'
 import {
   applyPlayerContactResponse,
@@ -67,14 +68,21 @@ describe('default player contact response math', () => {
   it('copies the incoming and outgoing values into a response event', () => {
     const contact = structuredClone(CONTACT)
     const outgoingVelocity = { x: 4, y: 6.3, z: -5 }
+    const hitTiming = {
+      offsetSteps: -2,
+      offsetSeconds:
+        -2 * VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds,
+    }
     const response = createPlayerBallContactResponseEvent(
       contact,
       outgoingVelocity,
+      hitTiming,
     )
 
     contact.ballPosition.x = 99
     contact.ballVelocity.y = 99
     outgoingVelocity.z = 99
+    hitTiming.offsetSteps = 99
 
     expect(response).toEqual({
       type: 'PLAYER_CONTACT_RESPONSE',
@@ -83,6 +91,9 @@ describe('default player contact response math', () => {
       ballPosition: { x: 1, y: 2, z: 3 },
       incomingVelocity: { x: 4, y: -3, z: 5 },
       outgoingVelocity: { x: 4, y: 6.3, z: -5 },
+      hitTimingOffsetSteps: -2,
+      hitTimingOffsetSeconds:
+        -2 * VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds,
     })
   })
 })
