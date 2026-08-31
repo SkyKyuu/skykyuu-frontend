@@ -185,12 +185,23 @@ export class FixedStepVolleyballSimulator {
     playerHitIntents: readonly PlayerHitIntent[],
   ): void {
     for (const intent of playerHitIntents) {
-      if (intent.hitPressed) {
-        this.hitBufferRemainingSecondsByPlayer.set(
-          intent.playerId,
-          PLAYER_HIT_BUFFER_CONFIG.durationSeconds,
-        )
+      if (!intent.hitPressed) {
+        continue
       }
+
+      const isConsumedOverlap =
+        this.respondedPlayerContactIds.has(intent.playerId) &&
+        this.activePlayerContactIds.has(intent.playerId)
+
+      if (isConsumedOverlap) {
+        this.hitBufferRemainingSecondsByPlayer.delete(intent.playerId)
+        continue
+      }
+
+      this.hitBufferRemainingSecondsByPlayer.set(
+        intent.playerId,
+        PLAYER_HIT_BUFFER_CONFIG.durationSeconds,
+      )
     }
   }
 

@@ -241,7 +241,46 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     ).toEqual(['PLAYER_CONTACT'])
   })
 
-  it('allows another response after leaving and re-entering overlap', () => {
+  it('discards a same-overlap hit when its advance executes no fixed step', () => {
+    const simulator = new FixedStepVolleyballSimulator({
+      position: { x: 0, y: 1, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+    })
+    const nearTarget = createTarget('player-b', 'B')
+    const farTarget = {
+      ...nearTarget,
+      position: { x: 10, y: 0, z: 0 },
+    }
+
+    expect(
+      simulator.advance(
+        FIXED_STEP,
+        [nearTarget],
+        [createIntent('player-b')],
+      ).events.map((event) => event.type),
+    ).toEqual(['PLAYER_CONTACT', 'PLAYER_CONTACT_RESPONSE'])
+
+    expect(
+      simulator.advance(
+        FIXED_STEP / 2,
+        [nearTarget],
+        [createIntent('player-b')],
+      ),
+    ).toEqual({ executedSteps: 0, events: [] })
+
+    expect(simulator.advance(FIXED_STEP / 2, [farTarget])).toEqual({
+      executedSteps: 1,
+      events: [],
+    })
+
+    expect(
+      simulator.advance(FIXED_STEP, [nearTarget]).events.map(
+        (event) => event.type,
+      ),
+    ).toEqual(['PLAYER_CONTACT'])
+  })
+
+  it('allows another response from a new hit after an observed leave', () => {
     const simulator = new FixedStepVolleyballSimulator({
       position: { x: 0, y: 1, z: 0 },
       velocity: { x: 0, y: 0, z: 0 },
@@ -256,6 +295,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(
       simulator.advance(FIXED_STEP, [nearTarget], [intent]).events,
     ).toHaveLength(2)
+    expect(simulator.advance(FIXED_STEP, [farTarget]).events).toEqual([])
     expect(
       simulator.advance(FIXED_STEP, [farTarget], [intent]).events,
     ).toEqual([])
