@@ -29,6 +29,7 @@ import {
   type PlayerHitTimingSample,
 } from '@/game/contact/playerHitTiming'
 import { classifyPlayerHitTiming } from '@/game/contact/playerHitTimingGrade'
+import { getPlayerHitTimingForwardMultiplier } from '@/game/contact/playerHitTimingPower'
 
 const STEP_COMPARISON_EPSILON = 1e-12
 
@@ -161,6 +162,8 @@ export class FixedStepVolleyballSimulator {
         const hitTimingGrade = classifyPlayerHitTiming(
           hitTiming.offsetSteps,
         )
+        const hitTimingForwardMultiplier =
+          getPlayerHitTimingForwardMultiplier(hitTimingGrade)
         const respondingContact = createPlayerBallContactEvent(
           this.state,
           respondingTarget,
@@ -168,6 +171,7 @@ export class FixedStepVolleyballSimulator {
         this.state = applyPlayerContactResponse(
           this.state,
           respondingContact,
+          hitTimingGrade,
         )
         this.respondedPlayerContactIds.add(respondingTarget.playerId)
         this.hitBufferRemainingSecondsByPlayer.delete(
@@ -180,6 +184,7 @@ export class FixedStepVolleyballSimulator {
             this.state.velocity,
             hitTiming,
             hitTimingGrade,
+            hitTimingForwardMultiplier,
           ),
         )
       }

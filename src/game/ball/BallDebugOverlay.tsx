@@ -122,6 +122,12 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
           </dd>
           <dt>Hit Timing</dt>
           <dd>{snapshot.lastContactResponse.hitTimingGrade}</dd>
+          <dt>Timing Forward x</dt>
+          <dd>
+            {formatValue(
+              snapshot.lastContactResponse.hitTimingForwardMultiplier,
+            )}
+          </dd>
           <dt>Incoming Vx</dt>
           <dd>{formatValue(snapshot.lastContactResponse.incomingVelocity.x)}</dd>
           <dt>Incoming Vy</dt>
