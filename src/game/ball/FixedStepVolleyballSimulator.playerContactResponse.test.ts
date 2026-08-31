@@ -103,6 +103,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       },
       hitTimingOffsetSteps: 0,
       hitTimingOffsetSeconds: 0,
+      hitTimingGrade: 'PERFECT',
     })
   })
 
@@ -188,6 +189,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       },
       hitTimingOffsetSteps: 1,
       hitTimingOffsetSeconds: FIXED_STEP,
+      hitTimingGrade: 'LATE',
     })
   })
 
@@ -216,6 +218,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(getResponseEvent(secondResponse.events)).toMatchObject({
       hitTimingOffsetSteps: -1,
       hitTimingOffsetSeconds: -FIXED_STEP,
+      hitTimingGrade: 'EARLY',
     })
 
     simulator.advance(FIXED_STEP, [farTarget])
@@ -329,6 +332,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(getResponseEvent(reentryResponse.events)).toMatchObject({
       hitTimingOffsetSteps: -1,
       hitTimingOffsetSeconds: -FIXED_STEP,
+      hitTimingGrade: 'EARLY',
     })
   })
 
@@ -366,6 +370,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       incomingVelocity: expectedIncomingState.velocity,
       hitTimingOffsetSteps: -1,
       hitTimingOffsetSeconds: -FIXED_STEP,
+      hitTimingGrade: 'EARLY',
     })
   })
 
@@ -397,6 +402,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(responseResult.events[1]).toMatchObject({
       hitTimingOffsetSteps: -3,
       hitTimingOffsetSeconds: -3 * FIXED_STEP,
+      hitTimingGrade: 'EARLY',
     })
   })
 
@@ -432,6 +438,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(responseResult.events[1]).toMatchObject({
       hitTimingOffsetSteps: -5,
       hitTimingOffsetSeconds: -5 * FIXED_STEP,
+      hitTimingGrade: 'VERY_EARLY',
     })
   })
 
@@ -515,6 +522,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(responseResult.events[1]).toMatchObject({
       hitTimingOffsetSteps: 0,
       hitTimingOffsetSeconds: 0,
+      hitTimingGrade: 'PERFECT',
     })
   })
 
@@ -586,6 +594,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       playerId: 'first-player',
       hitTimingOffsetSteps: 0,
       hitTimingOffsetSeconds: 0,
+      hitTimingGrade: 'PERFECT',
       outgoingVelocity: {
         z: PLAYER_CONTACT_RESPONSE_CONFIG.forwardVelocity,
       },
@@ -603,63 +612,97 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       playerId: 'second-player',
       hitTimingOffsetSteps: -1,
       hitTimingOffsetSeconds: -FIXED_STEP,
+      hitTimingGrade: 'EARLY',
     })
   })
 
-  it('keeps response physics identical for negative, zero, and positive offsets', () => {
+  it('keeps response physics identical across all grades for both teams', () => {
     const initialState = {
       position: { x: 0, y: 1, z: 0 },
       velocity: { x: 0.25, y: 0.5, z: 0.75 },
     }
-    const nearTarget = createTarget('player-b', 'B')
-    const farTarget = {
-      ...nearTarget,
-      position: { x: 10, y: 0, z: 0 },
+
+    function simulateResponse(
+      offsetSteps: number,
+      teamSide: 'A' | 'B',
+    ) {
+      const playerId = `player-${teamSide.toLowerCase()}`
+      const nearTarget = createTarget(playerId, teamSide)
+      const farTarget = {
+        ...nearTarget,
+        position: { x: 10, y: 0, z: 0 },
+      }
+      const simulator = new FixedStepVolleyballSimulator(initialState)
+
+      if (offsetSteps < 0) {
+        simulator.advance(
+          FIXED_STEP,
+          [farTarget],
+          [createIntent(playerId)],
+        )
+        for (let step = 1; step < Math.abs(offsetSteps); step += 1) {
+          simulator.advance(FIXED_STEP, [farTarget])
+        }
+
+        return getResponseEvent(
+          simulator.advance(FIXED_STEP, [nearTarget]).events,
+        )
+      }
+
+      if (offsetSteps === 0) {
+        return getResponseEvent(
+          simulator.advance(
+            FIXED_STEP,
+            [nearTarget],
+            [createIntent(playerId)],
+          ).events,
+        )
+      }
+
+      simulator.advance(FIXED_STEP, [nearTarget])
+      for (let step = 1; step < offsetSteps; step += 1) {
+        simulator.advance(FIXED_STEP, [nearTarget])
+      }
+
+      return getResponseEvent(
+        simulator.advance(
+          FIXED_STEP,
+          [nearTarget],
+          [createIntent(playerId)],
+        ).events,
+      )
     }
 
-    const earlySimulator = new FixedStepVolleyballSimulator(initialState)
-    earlySimulator.advance(
-      FIXED_STEP,
-      [farTarget],
-      [createIntent('player-b')],
+    const offsets = [-4, -1, 0, 1, 4]
+    const expectedGrades = [
+      'VERY_EARLY',
+      'EARLY',
+      'PERFECT',
+      'LATE',
+      'VERY_LATE',
+    ]
+    const teamBResponses = offsets.map((offset) =>
+      simulateResponse(offset, 'B'),
     )
-    const earlyResponse = getResponseEvent(
-      earlySimulator.advance(FIXED_STEP, [nearTarget]).events,
-    )
-
-    const sameStepSimulator = new FixedStepVolleyballSimulator(initialState)
-    const sameStepResponse = getResponseEvent(
-      sameStepSimulator.advance(
-        FIXED_STEP,
-        [nearTarget],
-        [createIntent('player-b')],
-      ).events,
+    const teamAResponses = offsets.map((offset) =>
+      simulateResponse(offset, 'A'),
     )
 
-    const lateSimulator = new FixedStepVolleyballSimulator(initialState)
-    lateSimulator.advance(FIXED_STEP, [nearTarget])
-    const lateResponse = getResponseEvent(
-      lateSimulator.advance(
-        FIXED_STEP,
-        [nearTarget],
-        [createIntent('player-b')],
-      ).events,
-    )
-
-    expect([
-      earlyResponse.hitTimingOffsetSteps,
-      sameStepResponse.hitTimingOffsetSteps,
-      lateResponse.hitTimingOffsetSteps,
-    ]).toEqual([-1, 0, 1])
-    expect([
-      earlyResponse.outgoingVelocity,
-      sameStepResponse.outgoingVelocity,
-      lateResponse.outgoingVelocity,
-    ]).toEqual([
-      { x: 0.25, y: 6.3, z: -5 },
-      { x: 0.25, y: 6.3, z: -5 },
-      { x: 0.25, y: 6.3, z: -5 },
-    ])
+    expect(
+      teamBResponses.map((response) => response.hitTimingOffsetSteps),
+    ).toEqual(offsets)
+    expect(
+      teamBResponses.map((response) => response.hitTimingGrade),
+    ).toEqual(expectedGrades)
+    expect(
+      teamAResponses.map((response) => response.hitTimingGrade),
+    ).toEqual(expectedGrades)
+    expect(
+      teamBResponses.map((response) => response.outgoingVelocity),
+    ).toEqual(offsets.map(() => ({ x: 0.25, y: 6.3, z: -5 })))
+    expect(
+      teamAResponses.map((response) => response.outgoingVelocity),
+    ).toEqual(offsets.map(() => ({ x: 0.25, y: 6.3, z: 5 })))
   })
 
   it('keeps ground contact terminal even with an active buffered hit at impact', () => {
@@ -762,6 +805,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       playerId: 'player-b',
       hitTimingOffsetSteps: -3,
       hitTimingOffsetSeconds: -3 * FIXED_STEP,
+      hitTimingGrade: 'EARLY',
       outgoingVelocity: {
         y: PLAYER_CONTACT_RESPONSE_CONFIG.upwardVelocity,
         z: -PLAYER_CONTACT_RESPONSE_CONFIG.forwardVelocity,
