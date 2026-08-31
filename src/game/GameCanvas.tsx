@@ -27,9 +27,9 @@ import {
 } from '@/game/movement/PlayerMovementController'
 import { INDOOR_PLAYER_SPAWNS } from '@/game/player/indoorPlayerSpawns'
 
-const PREVIEW_INPUT_BINDINGS = createPreviewInputBindings([
-  ...INDOOR_PLAYER_SPAWNS,
-].reverse())
+const PREVIEW_INPUT_BINDINGS = createPreviewInputBindings(
+  INDOOR_PLAYER_SPAWNS,
+)
 
 function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
