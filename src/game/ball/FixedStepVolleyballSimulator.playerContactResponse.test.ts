@@ -109,6 +109,34 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     ])
   })
 
+  it('does not rearm an expiring buffer from hitHeld alone', () => {
+    const simulator = new FixedStepVolleyballSimulator({
+      position: { x: 0, y: 1, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+    })
+    const nearTarget = createTarget('player-b', 'B')
+    const farTarget = {
+      ...nearTarget,
+      position: { x: 10, y: 0, z: 0 },
+    }
+    const heldOnly = createIntent('player-b', {
+      hitHeld: true,
+      hitPressed: false,
+    })
+
+    simulator.advance(FIXED_STEP, [farTarget], [createIntent('player-b')])
+
+    for (let step = 0; step < 5; step += 1) {
+      simulator.advance(FIXED_STEP, [farTarget], [heldOnly])
+    }
+
+    const result = simulator.advance(FIXED_STEP, [nearTarget], [heldOnly])
+
+    expect(result.events.map((event) => event.type)).toEqual([
+      'PLAYER_CONTACT',
+    ])
+  })
+
   it('responds during an existing overlap using the current response snapshot', () => {
     const initialState = {
       position: { x: 0, y: 1, z: 0 },
@@ -147,20 +175,70 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     })
   })
 
-  it('does not repeat a response after it is consumed in the same overlap', () => {
+  it('consumes a buffered hit so it cannot respond again after re-entry', () => {
     const simulator = new FixedStepVolleyballSimulator({
       position: { x: 0, y: 1, z: 0 },
       velocity: { x: 0, y: 0, z: 0 },
     })
-    const target = createTarget('player-b', 'B')
-    const intent = createIntent('player-b')
+    const nearTarget = createTarget('player-b', 'B')
+    const farTarget = {
+      ...nearTarget,
+      position: { x: 10, y: 0, z: 0 },
+    }
+
+    simulator.advance(
+      FIXED_STEP,
+      [farTarget],
+      [createIntent('player-b')],
+    )
+    expect(
+      simulator.advance(FIXED_STEP, [nearTarget]).events.map(
+        (event) => event.type,
+      ),
+    ).toEqual(['PLAYER_CONTACT', 'PLAYER_CONTACT_RESPONSE'])
+
+    simulator.advance(FIXED_STEP, [farTarget])
 
     expect(
-      simulator.advance(FIXED_STEP, [target], [intent]).events,
+      simulator.advance(FIXED_STEP, [nearTarget]).events.map(
+        (event) => event.type,
+      ),
+    ).toEqual(['PLAYER_CONTACT'])
+  })
+
+  it('discards a second hit pressed during the same responded overlap', () => {
+    const simulator = new FixedStepVolleyballSimulator({
+      position: { x: 0, y: 1, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+    })
+    const nearTarget = createTarget('player-b', 'B')
+    const farTarget = {
+      ...nearTarget,
+      position: { x: 10, y: 0, z: 0 },
+    }
+
+    expect(
+      simulator.advance(
+        FIXED_STEP,
+        [nearTarget],
+        [createIntent('player-b')],
+      ).events,
     ).toHaveLength(2)
     expect(
-      simulator.advance(FIXED_STEP, [target], [intent]).events,
+      simulator.advance(
+        FIXED_STEP,
+        [nearTarget],
+        [createIntent('player-b')],
+      ).events,
     ).toEqual([])
+
+    simulator.advance(FIXED_STEP, [farTarget])
+
+    expect(
+      simulator.advance(FIXED_STEP, [nearTarget]).events.map(
+        (event) => event.type,
+      ),
+    ).toEqual(['PLAYER_CONTACT'])
   })
 
   it('allows another response after leaving and re-entering overlap', () => {
@@ -182,17 +260,18 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       simulator.advance(FIXED_STEP, [farTarget], [intent]).events,
     ).toEqual([])
     expect(
-      simulator.advance(FIXED_STEP, [nearTarget], [intent]).events.map(
+      simulator.advance(FIXED_STEP, [nearTarget]).events.map(
         (event) => event.type,
       ),
     ).toEqual(['PLAYER_CONTACT', 'PLAYER_CONTACT_RESPONSE'])
   })
 
-  it('does not buffer a hit pressed before overlap', () => {
-    const simulator = new FixedStepVolleyballSimulator({
+  it('buffers a hit pressed one fixed step before overlap', () => {
+    const initialState = {
       position: { x: 0, y: 1, z: 0 },
-      velocity: { x: 0, y: 0, z: 0 },
-    })
+      velocity: { x: 0.25, y: 0.5, z: 0.75 },
+    }
+    const simulator = new FixedStepVolleyballSimulator(initialState)
     const nearTarget = createTarget('player-b', 'B')
     const farTarget = {
       ...nearTarget,
@@ -206,8 +285,169 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
         [createIntent('player-b')],
       ).events,
     ).toEqual([])
+    const responseResult = simulator.advance(FIXED_STEP, [nearTarget])
+    const expectedIncomingState = stepVolleyballFreeFlight(
+      stepVolleyballFreeFlight(initialState, FIXED_STEP),
+      FIXED_STEP,
+    )
+
+    expect(responseResult.events.map((event) => event.type)).toEqual([
+      'PLAYER_CONTACT',
+      'PLAYER_CONTACT_RESPONSE',
+    ])
+    expect(responseResult.events[1]).toMatchObject({
+      ballPosition: expectedIncomingState.position,
+      incomingVelocity: expectedIncomingState.velocity,
+    })
+  })
+
+  it('keeps a buffered hit active across several fixed steps inside the window', () => {
+    const simulator = new FixedStepVolleyballSimulator({
+      position: { x: 0, y: 1, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+    })
+    const nearTarget = createTarget('player-b', 'B')
+    const farTarget = {
+      ...nearTarget,
+      position: { x: 10, y: 0, z: 0 },
+    }
+
+    simulator.advance(
+      FIXED_STEP,
+      [farTarget],
+      [createIntent('player-b')],
+    )
+    simulator.advance(FIXED_STEP, [farTarget])
+    simulator.advance(FIXED_STEP, [farTarget])
+
     expect(
       simulator.advance(FIXED_STEP, [nearTarget]).events.map(
+        (event) => event.type,
+      ),
+    ).toEqual(['PLAYER_CONTACT', 'PLAYER_CONTACT_RESPONSE'])
+  })
+
+  it('accepts overlap on the sixth fixed step at the deterministic limit', () => {
+    const simulator = new FixedStepVolleyballSimulator({
+      position: { x: 0, y: 1, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+    })
+    const nearTarget = createTarget('player-b', 'B')
+    const farTarget = {
+      ...nearTarget,
+      position: { x: 10, y: 0, z: 0 },
+    }
+
+    simulator.advance(
+      FIXED_STEP,
+      [farTarget],
+      [createIntent('player-b')],
+    )
+
+    // After five executed 60 Hz steps, the buffer is still positive at the
+    // start of step six. It decays only after this response opportunity.
+    for (let step = 0; step < 4; step += 1) {
+      simulator.advance(FIXED_STEP, [farTarget])
+    }
+
+    expect(
+      simulator.advance(FIXED_STEP, [nearTarget]).events.map(
+        (event) => event.type,
+      ),
+    ).toEqual(['PLAYER_CONTACT', 'PLAYER_CONTACT_RESPONSE'])
+  })
+
+  it('expires the buffer before overlap on the seventh fixed step', () => {
+    const simulator = new FixedStepVolleyballSimulator({
+      position: { x: 0, y: 1, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+    })
+    const nearTarget = createTarget('player-b', 'B')
+    const farTarget = {
+      ...nearTarget,
+      position: { x: 10, y: 0, z: 0 },
+    }
+
+    simulator.advance(
+      FIXED_STEP,
+      [farTarget],
+      [createIntent('player-b')],
+    )
+
+    for (let step = 0; step < 5; step += 1) {
+      simulator.advance(FIXED_STEP, [farTarget])
+    }
+
+    expect(
+      simulator.advance(FIXED_STEP, [nearTarget]).events.map(
+        (event) => event.type,
+      ),
+    ).toEqual(['PLAYER_CONTACT'])
+  })
+
+  it('does not decay the buffer when accumulated time executes no fixed step', () => {
+    const simulator = new FixedStepVolleyballSimulator({
+      position: { x: 0, y: 1, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+    })
+    const nearTarget = createTarget('player-b', 'B')
+    const farTarget = {
+      ...nearTarget,
+      position: { x: 10, y: 0, z: 0 },
+    }
+
+    const armedWithoutStep = simulator.advance(
+      FIXED_STEP / 2,
+      [farTarget],
+      [createIntent('player-b')],
+    )
+    expect(armedWithoutStep.executedSteps).toBe(0)
+
+    simulator.advance(FIXED_STEP / 2, [farTarget])
+    for (let step = 0; step < 4; step += 1) {
+      simulator.advance(FIXED_STEP, [farTarget])
+    }
+
+    expect(
+      simulator.advance(FIXED_STEP, [nearTarget]).events.map(
+        (event) => event.type,
+      ),
+    ).toEqual(['PLAYER_CONTACT', 'PLAYER_CONTACT_RESPONSE'])
+  })
+
+  it.each([
+    ['zero', 0],
+    ['invalid', Number.NaN],
+  ])('preserves a hit edge across a %s frame delta', (_label, delta) => {
+    const simulator = new FixedStepVolleyballSimulator({
+      position: { x: 0, y: 1, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+    })
+    const target = createTarget('player-b', 'B')
+
+    expect(
+      simulator.advance(delta, [target], [createIntent('player-b')]),
+    ).toEqual({ executedSteps: 0, events: [] })
+    expect(
+      simulator.advance(FIXED_STEP, [target]).events.map(
+        (event) => event.type,
+      ),
+    ).toEqual(['PLAYER_CONTACT', 'PLAYER_CONTACT_RESPONSE'])
+  })
+
+  it('clears buffered hits on reset', () => {
+    const state = {
+      position: { x: 0, y: 1, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+    }
+    const simulator = new FixedStepVolleyballSimulator(state)
+    const target = createTarget('player-b', 'B')
+
+    simulator.advance(0, [target], [createIntent('player-b')])
+    simulator.reset(state)
+
+    expect(
+      simulator.advance(FIXED_STEP, [target]).events.map(
         (event) => event.type,
       ),
     ).toEqual(['PLAYER_CONTACT'])
@@ -259,17 +499,16 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     })
   })
 
-  it('keeps ground contact terminal even with overlap and hitPressed at impact', () => {
+  it('keeps ground contact terminal even with an active buffered hit at impact', () => {
     const simulator = new FixedStepVolleyballSimulator({
       position: { x: 0, y: 0.11, z: 0 },
       velocity: { x: 0, y: -1, z: 0 },
     })
+    const target = createTarget('ground-player', 'B')
 
-    const result = simulator.advance(
-      FIXED_STEP,
-      [createTarget('ground-player', 'B')],
-      [createIntent('ground-player')],
-    )
+    simulator.advance(0, [target], [createIntent('ground-player')])
+
+    const result = simulator.advance(FIXED_STEP, [target])
 
     expect(result.events.map((event) => event.type)).toEqual([
       'PLAYER_CONTACT',
@@ -310,25 +549,40 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     })
   })
 
-  it('runs a hit after Team B contact through response to an IN side-A landing', () => {
-    const simulator = new FixedStepVolleyballSimulator(
+  it('runs a deterministic buffered preview hit through to an IN side-A landing', () => {
+    const referenceSimulator = new FixedStepVolleyballSimulator(
       createPreviewVolleyballState(),
     )
     const targets = [
       createTarget('player-a', 'A', -4.5),
       createTarget('player-b', 'B', 4.5),
     ]
+    let contactStep = -1
+
+    for (let step = 1; step <= 300; step += 1) {
+      const result = referenceSimulator.advance(FIXED_STEP, targets)
+
+      if (result.events.some((event) => event.type === 'PLAYER_CONTACT')) {
+        contactStep = step
+        break
+      }
+    }
+
+    expect(contactStep).toBeGreaterThan(3)
+
+    const simulator = new FixedStepVolleyballSimulator(
+      createPreviewVolleyballState(),
+    )
     const observedEvents: BallSimulationEvent[] = []
-    let hitOnNextFrame = false
+    // The press step is derived from the observed contact step. Three 60 Hz
+    // fixed steps are 50 ms, safely inside the configured 100 ms window.
+    const bufferedHitStep = contactStep - 3
 
-    for (let frame = 0; frame < 300; frame += 1) {
-      const intents = hitOnNextFrame ? [createIntent('player-b')] : []
-      const result = simulator.advance(1 / 60, targets, intents)
+    for (let step = 1; step <= 300; step += 1) {
+      const intents =
+        step === bufferedHitStep ? [createIntent('player-b')] : []
+      const result = simulator.advance(FIXED_STEP, targets, intents)
       observedEvents.push(...result.events)
-
-      hitOnNextFrame = result.events.some(
-        (event) => event.type === 'PLAYER_CONTACT',
-      )
 
       if (result.events.some((event) => event.type === 'GROUND_CONTACT')) {
         break
