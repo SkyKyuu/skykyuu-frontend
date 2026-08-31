@@ -22,6 +22,7 @@ import {
   applyPlayerContactResponse,
   createPlayerBallContactResponseEvent,
 } from '@/game/contact/playerBallContactResponse'
+import { PLAYER_HIT_BUFFER_CONFIG } from '@/game/contact/playerHitBufferConfig'
 import type { PlayerHitIntent } from '@/game/contact/playerHitIntent'
 
 const STEP_COMPARISON_EPSILON = 1e-12
@@ -54,6 +55,7 @@ export class FixedStepVolleyballSimulator {
   private groundContactOccurred = false
   private activePlayerContactIds = new Set<string>()
   private respondedPlayerContactIds = new Set<string>()
+  private hitBufferRemainingSecondsByPlayer = new Map<string, number>()
 
   constructor(initialState: VolleyballState) {
     this.state = copyVolleyballState(initialState)
@@ -76,13 +78,15 @@ export class FixedStepVolleyballSimulator {
     playerContactTargets: readonly PlayerBallContactTarget[] = [],
     playerHitIntents: readonly PlayerHitIntent[] = [],
   ): BallSimulationAdvanceResult {
-    const safeFrameDeltaSeconds = getSafeFrameDeltaSeconds(frameDeltaSeconds)
-
-    if (safeFrameDeltaSeconds === 0) {
+    if (this.groundContactOccurred) {
       return { executedSteps: 0, events: [] }
     }
 
-    if (this.groundContactOccurred) {
+    this.armPlayerHitBuffers(playerHitIntents)
+
+    const safeFrameDeltaSeconds = getSafeFrameDeltaSeconds(frameDeltaSeconds)
+
+    if (safeFrameDeltaSeconds === 0) {
       return { executedSteps: 0, events: [] }
     }
 
@@ -117,6 +121,7 @@ export class FixedStepVolleyballSimulator {
             stateAtImpact.velocity,
           ),
         )
+        this.decayPlayerHitBuffers(fixedStepSeconds)
         this.groundContactOccurred = true
         this.accumulatedSeconds = 0
         executedSteps += 1
@@ -129,13 +134,14 @@ export class FixedStepVolleyballSimulator {
         this.detectPlayerContacts(this.state, playerContactTargets)
       events.push(...newContactEvents)
 
+      this.discardBuffersForRespondedOverlaps(overlappingTargets)
+
       const respondingTarget = overlappingTargets.find((target) => {
-        const intent = playerHitIntents.find(
-          ({ playerId }) => playerId === target.playerId,
-        )
+        const remainingBufferSeconds =
+          this.hitBufferRemainingSecondsByPlayer.get(target.playerId) ?? 0
 
         return (
-          intent?.hitPressed === true &&
+          remainingBufferSeconds > 0 &&
           !this.respondedPlayerContactIds.has(target.playerId)
         )
       })
@@ -150,6 +156,9 @@ export class FixedStepVolleyballSimulator {
           respondingContact,
         )
         this.respondedPlayerContactIds.add(respondingTarget.playerId)
+        this.hitBufferRemainingSecondsByPlayer.delete(
+          respondingTarget.playerId,
+        )
         events.push(
           createPlayerBallContactResponseEvent(
             respondingContact,
@@ -157,6 +166,8 @@ export class FixedStepVolleyballSimulator {
           ),
         )
       }
+
+      this.decayPlayerHitBuffers(fixedStepSeconds)
 
       this.accumulatedSeconds -= fixedStepSeconds
       executedSteps += 1
@@ -168,6 +179,56 @@ export class FixedStepVolleyballSimulator {
     }
 
     return { executedSteps, events }
+  }
+
+  private armPlayerHitBuffers(
+    playerHitIntents: readonly PlayerHitIntent[],
+  ): void {
+    for (const intent of playerHitIntents) {
+      if (!intent.hitPressed) {
+        continue
+      }
+
+      const isConsumedOverlap =
+        this.respondedPlayerContactIds.has(intent.playerId) &&
+        this.activePlayerContactIds.has(intent.playerId)
+
+      if (isConsumedOverlap) {
+        this.hitBufferRemainingSecondsByPlayer.delete(intent.playerId)
+        continue
+      }
+
+      this.hitBufferRemainingSecondsByPlayer.set(
+        intent.playerId,
+        PLAYER_HIT_BUFFER_CONFIG.durationSeconds,
+      )
+    }
+  }
+
+  private discardBuffersForRespondedOverlaps(
+    overlappingTargets: readonly PlayerBallContactTarget[],
+  ): void {
+    for (const target of overlappingTargets) {
+      if (this.respondedPlayerContactIds.has(target.playerId)) {
+        this.hitBufferRemainingSecondsByPlayer.delete(target.playerId)
+      }
+    }
+  }
+
+  private decayPlayerHitBuffers(fixedStepSeconds: number): void {
+    for (const [playerId, remainingSeconds] of
+      this.hitBufferRemainingSecondsByPlayer) {
+      const nextRemainingSeconds = remainingSeconds - fixedStepSeconds
+
+      if (nextRemainingSeconds <= STEP_COMPARISON_EPSILON) {
+        this.hitBufferRemainingSecondsByPlayer.delete(playerId)
+      } else {
+        this.hitBufferRemainingSecondsByPlayer.set(
+          playerId,
+          nextRemainingSeconds,
+        )
+      }
+    }
   }
 
   private detectPlayerContacts(
@@ -211,5 +272,6 @@ export class FixedStepVolleyballSimulator {
     this.groundContactOccurred = false
     this.activePlayerContactIds.clear()
     this.respondedPlayerContactIds.clear()
+    this.hitBufferRemainingSecondsByPlayer.clear()
   }
 }
