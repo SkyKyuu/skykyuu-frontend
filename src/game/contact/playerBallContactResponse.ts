@@ -5,6 +5,7 @@ import type {
 import type { PlayerBallContactEvent } from '@/game/contact/playerBallContact'
 import { PLAYER_CONTACT_RESPONSE_CONFIG } from '@/game/contact/playerBallContactResponseConfig'
 import type { PlayerHitTimingSample } from '@/game/contact/playerHitTiming'
+import type { PlayerHitTimingGrade } from '@/game/contact/playerHitTimingGrade'
 import type { TeamSide } from '@/game/team/teamTypes'
 
 export interface PlayerBallContactResponseEvent {
@@ -16,6 +17,7 @@ export interface PlayerBallContactResponseEvent {
   outgoingVelocity: BallVector3
   hitTimingOffsetSteps: number
   hitTimingOffsetSeconds: number
+  hitTimingGrade: PlayerHitTimingGrade
 }
 
 export function getDefaultPlayerContactResponseVelocity(
@@ -49,6 +51,7 @@ export function createPlayerBallContactResponseEvent(
   playerContact: PlayerBallContactEvent,
   outgoingVelocity: BallVector3,
   hitTiming: PlayerHitTimingSample,
+  hitTimingGrade: PlayerHitTimingGrade,
 ): PlayerBallContactResponseEvent {
   return {
     type: 'PLAYER_CONTACT_RESPONSE',
@@ -59,5 +62,6 @@ export function createPlayerBallContactResponseEvent(
     outgoingVelocity: { ...outgoingVelocity },
     hitTimingOffsetSteps: hitTiming.offsetSteps,
     hitTimingOffsetSeconds: hitTiming.offsetSeconds,
+    hitTimingGrade,
   }
 }

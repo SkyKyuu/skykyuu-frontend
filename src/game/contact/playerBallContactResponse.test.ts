@@ -77,6 +77,7 @@ describe('default player contact response math', () => {
       contact,
       outgoingVelocity,
       hitTiming,
+      'EARLY',
     )
 
     contact.ballPosition.x = 99
@@ -94,6 +95,7 @@ describe('default player contact response math', () => {
       hitTimingOffsetSteps: -2,
       hitTimingOffsetSeconds:
         -2 * VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds,
+      hitTimingGrade: 'EARLY',
     })
   })
 })

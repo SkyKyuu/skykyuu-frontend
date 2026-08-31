@@ -28,6 +28,7 @@ import {
   createPlayerHitTimingSample,
   type PlayerHitTimingSample,
 } from '@/game/contact/playerHitTiming'
+import { classifyPlayerHitTiming } from '@/game/contact/playerHitTimingGrade'
 
 const STEP_COMPARISON_EPSILON = 1e-12
 
@@ -157,6 +158,9 @@ export class FixedStepVolleyballSimulator {
           respondingTarget.playerId,
           fixedStepSeconds,
         )
+        const hitTimingGrade = classifyPlayerHitTiming(
+          hitTiming.offsetSteps,
+        )
         const respondingContact = createPlayerBallContactEvent(
           this.state,
           respondingTarget,
@@ -175,6 +179,7 @@ export class FixedStepVolleyballSimulator {
             respondingContact,
             this.state.velocity,
             hitTiming,
+            hitTimingGrade,
           ),
         )
       }
