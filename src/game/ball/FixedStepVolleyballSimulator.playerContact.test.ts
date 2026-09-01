@@ -25,7 +25,7 @@ function createTarget(
 }
 
 function createHitIntent(playerId: string): PlayerHitIntent {
-  return { playerId, hitHeld: true, hitPressed: true }
+  return { playerId, hitHeld: true, hitPressed: true, aimLateral: 0 }
 }
 
 describe('FixedStepVolleyballSimulator player contact integration', () => {

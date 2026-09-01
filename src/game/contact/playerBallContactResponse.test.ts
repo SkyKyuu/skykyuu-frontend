@@ -119,6 +119,7 @@ describe('player contact response math', () => {
       hitTiming,
       'EARLY',
       0.9,
+      -0.75,
     )
 
     contact.ballPosition.x = 99
@@ -138,6 +139,7 @@ describe('player contact response math', () => {
         -2 * VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds,
       hitTimingGrade: 'EARLY',
       hitTimingForwardMultiplier: 0.9,
+      hitAimLateral: -0.75,
     })
   })
 })

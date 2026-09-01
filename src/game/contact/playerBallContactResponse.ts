@@ -20,6 +20,8 @@ export interface PlayerBallContactResponseEvent {
   hitTimingOffsetSeconds: number
   hitTimingGrade: PlayerHitTimingGrade
   hitTimingForwardMultiplier: number
+  /** Player-local lateral aim captured at hit press; not world X. */
+  hitAimLateral: number
 }
 
 export function getPlayerContactResponseVelocity(
@@ -59,6 +61,7 @@ export function createPlayerBallContactResponseEvent(
   hitTiming: PlayerHitTimingSample,
   hitTimingGrade: PlayerHitTimingGrade,
   hitTimingForwardMultiplier: number,
+  hitAimLateral: number,
 ): PlayerBallContactResponseEvent {
   return {
     type: 'PLAYER_CONTACT_RESPONSE',
@@ -71,5 +74,6 @@ export function createPlayerBallContactResponseEvent(
     hitTimingOffsetSeconds: hitTiming.offsetSeconds,
     hitTimingGrade,
     hitTimingForwardMultiplier,
+    hitAimLateral,
   }
 }
