@@ -12,7 +12,10 @@ import type {
   PlayerBallContactTarget,
 } from '@/game/contact/playerBallContact'
 import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallContactResponse'
-import type { PlayerHitIntent } from '@/game/contact/playerHitIntent'
+import {
+  createPlayerHitIntent,
+  type PlayerHitIntent,
+} from '@/game/contact/playerHitIntent'
 import { createGameScene } from '@/game/createGameScene'
 import {
   InputDebugOverlay,
@@ -79,11 +82,7 @@ function GameCanvas() {
 
       const snapshots = inputManager.update()
       const playerHitIntents: PlayerHitIntent[] = snapshots.map(
-        ({ playerId, hitHeld, hitPressed }) => ({
-          playerId,
-          hitHeld,
-          hitPressed,
-        }),
+        createPlayerHitIntent,
       )
       const frameDeltaSeconds = engine.getDeltaTime() / 1000
 

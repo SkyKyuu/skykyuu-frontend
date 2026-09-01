@@ -23,6 +23,7 @@ import {
   createPlayerBallContactResponseEvent,
 } from '@/game/contact/playerBallContactResponse'
 import { PLAYER_HIT_BUFFER_CONFIG } from '@/game/contact/playerHitBufferConfig'
+import { validatePlayerHitAimLateral } from '@/game/contact/playerHitAim'
 import type { PlayerHitIntent } from '@/game/contact/playerHitIntent'
 import {
   createPlayerHitTimingSample,
@@ -63,6 +64,7 @@ export class FixedStepVolleyballSimulator {
   private respondedPlayerContactIds = new Set<string>()
   private hitBufferRemainingSecondsByPlayer = new Map<string, number>()
   private hitPressStepByPlayer = new Map<string, number>()
+  private hitAimLateralByPlayer = new Map<string, number>()
   private contactEntryStepByPlayer = new Map<string, number>()
 
   constructor(initialState: VolleyballState) {
@@ -129,7 +131,7 @@ export class FixedStepVolleyballSimulator {
             stateAtImpact.velocity,
           ),
         )
-        this.decayPlayerHitBuffers(fixedStepSeconds)
+        this.clearPendingPlayerHits()
         this.groundContactOccurred = true
         this.accumulatedSeconds = 0
         executedSteps += 1
@@ -164,6 +166,9 @@ export class FixedStepVolleyballSimulator {
         )
         const hitTimingForwardMultiplier =
           getPlayerHitTimingForwardMultiplier(hitTimingGrade)
+        const hitAimLateral = this.getResponseHitAimLateral(
+          respondingTarget.playerId,
+        )
         const respondingContact = createPlayerBallContactEvent(
           this.state,
           respondingTarget,
@@ -173,20 +178,21 @@ export class FixedStepVolleyballSimulator {
           respondingContact,
           hitTimingGrade,
         )
+        const responseEvent = createPlayerBallContactResponseEvent(
+          respondingContact,
+          this.state.velocity,
+          hitTiming,
+          hitTimingGrade,
+          hitTimingForwardMultiplier,
+          hitAimLateral,
+        )
         this.respondedPlayerContactIds.add(respondingTarget.playerId)
         this.hitBufferRemainingSecondsByPlayer.delete(
           respondingTarget.playerId,
         )
         this.hitPressStepByPlayer.delete(respondingTarget.playerId)
-        events.push(
-          createPlayerBallContactResponseEvent(
-            respondingContact,
-            this.state.velocity,
-            hitTiming,
-            hitTimingGrade,
-            hitTimingForwardMultiplier,
-          ),
-        )
+        this.hitAimLateralByPlayer.delete(respondingTarget.playerId)
+        events.push(responseEvent)
       }
 
       this.decayPlayerHitBuffers(fixedStepSeconds)
@@ -211,6 +217,8 @@ export class FixedStepVolleyballSimulator {
         continue
       }
 
+      const aimLateral = validatePlayerHitAimLateral(intent.aimLateral)
+
       const isConsumedOverlap =
         this.respondedPlayerContactIds.has(intent.playerId) &&
         this.activePlayerContactIds.has(intent.playerId)
@@ -218,6 +226,7 @@ export class FixedStepVolleyballSimulator {
       if (isConsumedOverlap) {
         this.hitBufferRemainingSecondsByPlayer.delete(intent.playerId)
         this.hitPressStepByPlayer.delete(intent.playerId)
+        this.hitAimLateralByPlayer.delete(intent.playerId)
         continue
       }
 
@@ -229,6 +238,7 @@ export class FixedStepVolleyballSimulator {
         intent.playerId,
         this.simulationStepCount,
       )
+      this.hitAimLateralByPlayer.set(intent.playerId, aimLateral)
     }
   }
 
@@ -239,6 +249,7 @@ export class FixedStepVolleyballSimulator {
       if (this.respondedPlayerContactIds.has(target.playerId)) {
         this.hitBufferRemainingSecondsByPlayer.delete(target.playerId)
         this.hitPressStepByPlayer.delete(target.playerId)
+        this.hitAimLateralByPlayer.delete(target.playerId)
       }
     }
   }
@@ -251,6 +262,7 @@ export class FixedStepVolleyballSimulator {
       if (nextRemainingSeconds <= STEP_COMPARISON_EPSILON) {
         this.hitBufferRemainingSecondsByPlayer.delete(playerId)
         this.hitPressStepByPlayer.delete(playerId)
+        this.hitAimLateralByPlayer.delete(playerId)
       } else {
         this.hitBufferRemainingSecondsByPlayer.set(
           playerId,
@@ -258,6 +270,12 @@ export class FixedStepVolleyballSimulator {
         )
       }
     }
+  }
+
+  private clearPendingPlayerHits(): void {
+    this.hitBufferRemainingSecondsByPlayer.clear()
+    this.hitPressStepByPlayer.clear()
+    this.hitAimLateralByPlayer.clear()
   }
 
   private detectPlayerContacts(
@@ -324,6 +342,18 @@ export class FixedStepVolleyballSimulator {
     )
   }
 
+  private getResponseHitAimLateral(playerId: string): number {
+    const aimLateral = this.hitAimLateralByPlayer.get(playerId)
+
+    if (aimLateral === undefined) {
+      throw new Error(
+        `Missing hit aim lateral for eligible player: ${playerId}`,
+      )
+    }
+
+    return aimLateral
+  }
+
   reset(state: VolleyballState): void {
     this.state = copyVolleyballState(state)
     this.accumulatedSeconds = 0
@@ -333,6 +363,7 @@ export class FixedStepVolleyballSimulator {
     this.respondedPlayerContactIds.clear()
     this.hitBufferRemainingSecondsByPlayer.clear()
     this.hitPressStepByPlayer.clear()
+    this.hitAimLateralByPlayer.clear()
     this.contactEntryStepByPlayer.clear()
   }
 }
