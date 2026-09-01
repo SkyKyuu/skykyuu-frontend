@@ -111,12 +111,19 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingGrade: 'PERFECT',
       hitTimingForwardMultiplier: 1,
       hitAimLateral: 0,
+      hitAimWorldX: 0,
+      hitAimVelocityX: 0,
     })
   })
 
-  it.each([-1, 0, 1, 0.375])(
-    'captures direct player-local aim %s without changing PERFECT physics',
-    (aimLateral) => {
+  it.each([
+    [-1, 1, 3, 3.25],
+    [0, 0, 0, 0.25],
+    [1, -1, -3, -2.75],
+    [0.375, -0.375, -1.125, -0.875],
+  ] as const)(
+    'applies Team B player-local aim %s to PERFECT lateral physics',
+    (aimLateral, hitAimWorldX, hitAimVelocityX, outgoingX) => {
       const simulator = new FixedStepVolleyballSimulator({
         position: { x: 0, y: 1, z: 0 },
         velocity: { x: 0.25, y: 0.5, z: 0.75 },
@@ -135,14 +142,20 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
         hitTimingGrade: 'PERFECT',
         hitTimingForwardMultiplier: 1,
         hitAimLateral: aimLateral,
-        outgoingVelocity: { x: 0.25, y: 6.3, z: -5 },
+        hitAimWorldX,
+        hitAimVelocityX,
+        incomingVelocity: { x: 0.25 },
+        outgoingVelocity: { x: outgoingX, y: 6.3, z: -5 },
       })
     },
   )
 
-  it.each([-1, 1])(
-    'keeps EARLY timing power unchanged for player-local aim %s',
-    (aimLateral) => {
+  it.each([
+    [-1, 1, 3, 3.25],
+    [1, -1, -3, -2.75],
+  ] as const)(
+    'keeps EARLY timing power independent from Team B aim %s',
+    (aimLateral, hitAimWorldX, hitAimVelocityX, outgoingX) => {
       const initialState = {
         position: { x: 0, y: 1, z: 0 },
         velocity: { x: 0.25, y: 0.5, z: 0.75 },
@@ -166,7 +179,9 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
         hitTimingGrade: 'EARLY',
         hitTimingForwardMultiplier: 0.9,
         hitAimLateral: aimLateral,
-        outgoingVelocity: { x: 0.25, y: 6.3, z: -4.5 },
+        hitAimWorldX,
+        hitAimVelocityX,
+        outgoingVelocity: { x: outgoingX, y: 6.3, z: -4.5 },
       })
     },
   )
@@ -259,6 +274,8 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingGrade: 'LATE',
       hitTimingForwardMultiplier: 0.9,
       hitAimLateral: 0,
+      hitAimWorldX: 0,
+      hitAimVelocityX: 0,
     })
   })
 
@@ -406,6 +423,8 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingGrade: 'EARLY',
       hitTimingForwardMultiplier: 0.9,
       hitAimLateral: 0.5,
+      hitAimWorldX: -0.5,
+      hitAimVelocityX: -1.5,
     })
   })
 
@@ -446,6 +465,11 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingGrade: 'EARLY',
       hitTimingForwardMultiplier: 0.9,
       hitAimLateral: -0.75,
+      hitAimWorldX: 0.75,
+      hitAimVelocityX: 2.25,
+      outgoingVelocity: {
+        x: expectedIncomingState.velocity.x + 2.25,
+      },
     })
   })
 
@@ -482,6 +506,9 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingOffsetSteps: -1,
       hitTimingOffsetSeconds: -FIXED_STEP,
       hitAimLateral: 1,
+      hitAimWorldX: -1,
+      hitAimVelocityX: -3,
+      outgoingVelocity: { x: -3 },
     })
   })
 
@@ -550,6 +577,9 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingGrade: 'EARLY',
       hitTimingForwardMultiplier: 0.9,
       hitAimLateral: -1,
+      hitAimWorldX: 1,
+      hitAimVelocityX: 3,
+      outgoingVelocity: { x: 3 },
     })
   })
 
@@ -626,6 +656,9 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(getResponseEvent(newResponse.events)).toMatchObject({
       hitTimingOffsetSteps: -1,
       hitAimLateral: 0.5,
+      hitAimWorldX: -0.5,
+      hitAimVelocityX: -1.5,
+      outgoingVelocity: { x: -1.5 },
     })
   })
 
@@ -686,6 +719,9 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingGrade: 'PERFECT',
       hitTimingForwardMultiplier: 1,
       hitAimLateral: 0.5,
+      hitAimWorldX: -0.5,
+      hitAimVelocityX: -1.5,
+      outgoingVelocity: { x: -1.5 },
     })
   })
 
@@ -762,7 +798,10 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingGrade: 'PERFECT',
       hitTimingForwardMultiplier: 1,
       hitAimLateral: 0.5,
+      hitAimWorldX: 0.5,
+      hitAimVelocityX: 1.5,
       outgoingVelocity: {
+        x: 1.5,
         z: PLAYER_CONTACT_RESPONSE_CONFIG.forwardVelocity,
       },
     })
@@ -782,6 +821,10 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingGrade: 'EARLY',
       hitTimingForwardMultiplier: 0.9,
       hitAimLateral: -0.75,
+      hitAimWorldX: 0.75,
+      hitAimVelocityX: 2.25,
+      incomingVelocity: { x: 1.5 },
+      outgoingVelocity: { x: 3.75 },
     })
   })
 
@@ -880,6 +923,16 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(
       [...teamBResponses, ...teamAResponses].map(
         (response) => response.hitAimLateral,
+      ),
+    ).toEqual([...offsets, ...offsets].map(() => 0))
+    expect(
+      [...teamBResponses, ...teamAResponses].map(
+        (response) => response.hitAimWorldX,
+      ),
+    ).toEqual([...offsets, ...offsets].map(() => 0))
+    expect(
+      [...teamBResponses, ...teamAResponses].map(
+        (response) => response.hitAimVelocityX,
       ),
     ).toEqual([...offsets, ...offsets].map(() => 0))
     expect(

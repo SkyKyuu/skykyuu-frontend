@@ -37,7 +37,7 @@ describe('player contact response math', () => {
       const incomingVelocity = { x: 1, y: -2, z: 3 }
 
       expect(
-        getPlayerContactResponseVelocity(incomingVelocity, 'A', grade),
+        getPlayerContactResponseVelocity(incomingVelocity, 'A', grade, 0),
       ).toEqual({
         x: 1,
         y: PLAYER_CONTACT_RESPONSE_CONFIG.upwardVelocity,
@@ -55,6 +55,7 @@ describe('player contact response math', () => {
           { x: 1, y: -2, z: 3 },
           'B',
           grade,
+          0,
         ),
       ).toEqual({
         x: 1,
@@ -64,12 +65,13 @@ describe('player contact response math', () => {
     },
   )
 
-  it('preserves the exact pre-F2.11 baseline for PERFECT timing', () => {
+  it('preserves the exact pre-F2.13 baseline for neutral PERFECT timing', () => {
     expect(
       getPlayerContactResponseVelocity(
         { x: 0.25, y: -2, z: 3 },
         'A',
         'PERFECT',
+        0,
       ),
     ).toEqual({ x: 0.25, y: 6.3, z: 5 })
     expect(
@@ -77,9 +79,75 @@ describe('player contact response math', () => {
         { x: 0.25, y: -2, z: 3 },
         'B',
         'PERFECT',
+        0,
       ),
     ).toEqual({ x: 0.25, y: 6.3, z: -5 })
   })
+
+  it.each([
+    [-1, -2.75],
+    [0, 0.25],
+    [1, 3.25],
+  ] as const)(
+    'adds Team A local aim %f to incoming lateral momentum',
+    (aimLateral, expectedX) => {
+      expect(
+        getPlayerContactResponseVelocity(
+          { x: 0.25, y: -2, z: 3 },
+          'A',
+          'PERFECT',
+          aimLateral,
+        ),
+      ).toEqual({ x: expectedX, y: 6.3, z: 5 })
+    },
+  )
+
+  it.each([
+    [-1, 3.25],
+    [0, 0.25],
+    [1, -2.75],
+  ] as const)(
+    'adds inverted Team B local aim %f to incoming lateral momentum',
+    (aimLateral, expectedX) => {
+      expect(
+        getPlayerContactResponseVelocity(
+          { x: 0.25, y: -2, z: 3 },
+          'B',
+          'PERFECT',
+          aimLateral,
+        ),
+      ).toEqual({ x: expectedX, y: 6.3, z: -5 })
+    },
+  )
+
+  it('preserves analog aim magnitude without clamping outgoing X', () => {
+    expect(
+      getPlayerContactResponseVelocity(
+        { x: 0.25, y: -2, z: 3 },
+        'A',
+        'PERFECT',
+        0.5,
+      ),
+    ).toEqual({ x: 1.75, y: 6.3, z: 5 })
+  })
+
+  it.each([
+    ['EARLY', -4.5],
+    ['PERFECT', -5],
+    ['VERY_EARLY', -3.75],
+  ] as const)(
+    'keeps Team B aim X independent from %s forward timing power',
+    (grade, expectedZ) => {
+      expect(
+        getPlayerContactResponseVelocity(
+          { x: 0.25, y: -2, z: 3 },
+          'B',
+          grade,
+          1,
+        ),
+      ).toEqual({ x: -2.75, y: 6.3, z: expectedZ })
+    },
+  )
 
   it('preserves position and leaves source state and contact immutable', () => {
     const state = {
@@ -89,7 +157,7 @@ describe('player contact response math', () => {
     const originalState = structuredClone(state)
     const originalContact = structuredClone(CONTACT)
 
-    const nextState = applyPlayerContactResponse(state, CONTACT, 'EARLY')
+    const nextState = applyPlayerContactResponse(state, CONTACT, 'EARLY', 0)
 
     expect(nextState).toEqual({
       position: state.position,
@@ -107,7 +175,7 @@ describe('player contact response math', () => {
 
   it('copies the incoming and outgoing values into a response event', () => {
     const contact = structuredClone(CONTACT)
-    const outgoingVelocity = { x: 4, y: 6.3, z: -4.5 }
+    const outgoingVelocity = { x: 6.25, y: 6.3, z: -4.5 }
     const hitTiming = {
       offsetSteps: -2,
       offsetSeconds:
@@ -120,6 +188,8 @@ describe('player contact response math', () => {
       'EARLY',
       0.9,
       -0.75,
+      0.75,
+      2.25,
     )
 
     contact.ballPosition.x = 99
@@ -133,13 +203,15 @@ describe('player contact response math', () => {
       teamSide: 'B',
       ballPosition: { x: 1, y: 2, z: 3 },
       incomingVelocity: { x: 4, y: -3, z: 5 },
-      outgoingVelocity: { x: 4, y: 6.3, z: -4.5 },
+      outgoingVelocity: { x: 6.25, y: 6.3, z: -4.5 },
       hitTimingOffsetSteps: -2,
       hitTimingOffsetSeconds:
         -2 * VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds,
       hitTimingGrade: 'EARLY',
       hitTimingForwardMultiplier: 0.9,
       hitAimLateral: -0.75,
+      hitAimWorldX: 0.75,
+      hitAimVelocityX: 2.25,
     })
   })
 })

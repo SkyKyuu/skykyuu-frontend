@@ -24,6 +24,10 @@ import {
 } from '@/game/contact/playerBallContactResponse'
 import { PLAYER_HIT_BUFFER_CONFIG } from '@/game/contact/playerHitBufferConfig'
 import { validatePlayerHitAimLateral } from '@/game/contact/playerHitAim'
+import {
+  getPlayerHitAimVelocityX,
+  playerHitAimLateralToWorldX,
+} from '@/game/contact/playerHitAimMath'
 import type { PlayerHitIntent } from '@/game/contact/playerHitIntent'
 import {
   createPlayerHitTimingSample,
@@ -173,10 +177,19 @@ export class FixedStepVolleyballSimulator {
           this.state,
           respondingTarget,
         )
+        const hitAimWorldX = playerHitAimLateralToWorldX(
+          respondingContact.teamSide,
+          hitAimLateral,
+        )
+        const hitAimVelocityX = getPlayerHitAimVelocityX(
+          respondingContact.teamSide,
+          hitAimLateral,
+        )
         this.state = applyPlayerContactResponse(
           this.state,
           respondingContact,
           hitTimingGrade,
+          hitAimLateral,
         )
         const responseEvent = createPlayerBallContactResponseEvent(
           respondingContact,
@@ -185,6 +198,8 @@ export class FixedStepVolleyballSimulator {
           hitTimingGrade,
           hitTimingForwardMultiplier,
           hitAimLateral,
+          hitAimWorldX,
+          hitAimVelocityX,
         )
         this.respondedPlayerContactIds.add(respondingTarget.playerId)
         this.hitBufferRemainingSecondsByPlayer.delete(

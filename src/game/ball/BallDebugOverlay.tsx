@@ -135,6 +135,20 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
               3,
             )}
           </dd>
+          <dt>Hit Aim World X</dt>
+          <dd>
+            {formatSignedValue(
+              snapshot.lastContactResponse.hitAimWorldX,
+              3,
+            )}
+          </dd>
+          <dt>Aim Vx Contribution</dt>
+          <dd>
+            {formatSignedValue(
+              snapshot.lastContactResponse.hitAimVelocityX,
+              3,
+            )}
+          </dd>
           <dt>Incoming Vx</dt>
           <dd>{formatValue(snapshot.lastContactResponse.incomingVelocity.x)}</dd>
           <dt>Incoming Vy</dt>
