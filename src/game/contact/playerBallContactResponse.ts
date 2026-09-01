@@ -4,6 +4,7 @@ import type {
 } from '@/game/ball/volleyballState'
 import type { PlayerBallContactEvent } from '@/game/contact/playerBallContact'
 import { PLAYER_CONTACT_RESPONSE_CONFIG } from '@/game/contact/playerBallContactResponseConfig'
+import { getPlayerHitAimVelocityX } from '@/game/contact/playerHitAimMath'
 import type { PlayerHitTimingSample } from '@/game/contact/playerHitTiming'
 import type { PlayerHitTimingGrade } from '@/game/contact/playerHitTimingGrade'
 import { getPlayerHitTimingForwardMultiplier } from '@/game/contact/playerHitTimingPower'
@@ -22,19 +23,25 @@ export interface PlayerBallContactResponseEvent {
   hitTimingForwardMultiplier: number
   /** Player-local lateral aim captured at hit press; not world X. */
   hitAimLateral: number
+  /** Player-local lateral aim converted to world X. */
+  hitAimWorldX: number
+  /** Lateral velocity contribution applied to the incoming ball velocity. */
+  hitAimVelocityX: number
 }
 
 export function getPlayerContactResponseVelocity(
   incomingVelocity: BallVector3,
   teamSide: TeamSide,
   hitTimingGrade: PlayerHitTimingGrade,
+  hitAimLateral: number,
 ): BallVector3 {
   const forwardMagnitude =
     PLAYER_CONTACT_RESPONSE_CONFIG.forwardVelocity *
     getPlayerHitTimingForwardMultiplier(hitTimingGrade)
+  const aimVelocityX = getPlayerHitAimVelocityX(teamSide, hitAimLateral)
 
   return {
-    x: incomingVelocity.x,
+    x: incomingVelocity.x + aimVelocityX,
     y: PLAYER_CONTACT_RESPONSE_CONFIG.upwardVelocity,
     z: teamSide === 'A' ? forwardMagnitude : -forwardMagnitude,
   }
@@ -44,6 +51,7 @@ export function applyPlayerContactResponse(
   state: VolleyballState,
   playerContact: PlayerBallContactEvent,
   hitTimingGrade: PlayerHitTimingGrade,
+  hitAimLateral: number,
 ): VolleyballState {
   return {
     position: { ...state.position },
@@ -51,6 +59,7 @@ export function applyPlayerContactResponse(
       state.velocity,
       playerContact.teamSide,
       hitTimingGrade,
+      hitAimLateral,
     ),
   }
 }
@@ -62,6 +71,8 @@ export function createPlayerBallContactResponseEvent(
   hitTimingGrade: PlayerHitTimingGrade,
   hitTimingForwardMultiplier: number,
   hitAimLateral: number,
+  hitAimWorldX: number,
+  hitAimVelocityX: number,
 ): PlayerBallContactResponseEvent {
   return {
     type: 'PLAYER_CONTACT_RESPONSE',
@@ -75,5 +86,7 @@ export function createPlayerBallContactResponseEvent(
     hitTimingGrade,
     hitTimingForwardMultiplier,
     hitAimLateral,
+    hitAimWorldX,
+    hitAimVelocityX,
   }
 }
