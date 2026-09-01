@@ -110,6 +110,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingOffsetSeconds: 0,
       hitTimingGrade: 'PERFECT',
       hitTimingForwardMultiplier: 1,
+      hitTimingAccuracyMultiplier: 1,
       hitAimLateral: 0,
       hitAimWorldX: 0,
       hitAimVelocityX: 0,
@@ -141,6 +142,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
         hitTimingOffsetSteps: 0,
         hitTimingGrade: 'PERFECT',
         hitTimingForwardMultiplier: 1,
+        hitTimingAccuracyMultiplier: 1,
         hitAimLateral: aimLateral,
         hitAimWorldX,
         hitAimVelocityX,
@@ -178,6 +180,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
         hitTimingOffsetSteps: -1,
         hitTimingGrade: 'EARLY',
         hitTimingForwardMultiplier: 0.9,
+        hitTimingAccuracyMultiplier: 0.85,
         hitAimLateral: aimLateral,
         hitAimWorldX,
         hitAimVelocityX,
@@ -273,6 +276,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingOffsetSeconds: FIXED_STEP,
       hitTimingGrade: 'LATE',
       hitTimingForwardMultiplier: 0.9,
+      hitTimingAccuracyMultiplier: 0.85,
       hitAimLateral: 0,
       hitAimWorldX: 0,
       hitAimVelocityX: 0,
@@ -306,6 +310,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingOffsetSeconds: -FIXED_STEP,
       hitTimingGrade: 'EARLY',
       hitTimingForwardMultiplier: 0.9,
+      hitTimingAccuracyMultiplier: 0.85,
     })
 
     simulator.advance(FIXED_STEP, [farTarget])
@@ -422,6 +427,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingOffsetSeconds: -FIXED_STEP,
       hitTimingGrade: 'EARLY',
       hitTimingForwardMultiplier: 0.9,
+      hitTimingAccuracyMultiplier: 0.85,
       hitAimLateral: 0.5,
       hitAimWorldX: -0.5,
       hitAimVelocityX: -1.5,
@@ -464,6 +470,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingOffsetSeconds: -FIXED_STEP,
       hitTimingGrade: 'EARLY',
       hitTimingForwardMultiplier: 0.9,
+      hitTimingAccuracyMultiplier: 0.85,
       hitAimLateral: -0.75,
       hitAimWorldX: 0.75,
       hitAimVelocityX: 2.25,
@@ -617,6 +624,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingOffsetSeconds: -5 * FIXED_STEP,
       hitTimingGrade: 'VERY_EARLY',
       hitTimingForwardMultiplier: 0.75,
+      hitTimingAccuracyMultiplier: 0.6,
     })
   })
 
@@ -718,6 +726,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingOffsetSeconds: 0,
       hitTimingGrade: 'PERFECT',
       hitTimingForwardMultiplier: 1,
+      hitTimingAccuracyMultiplier: 1,
       hitAimLateral: 0.5,
       hitAimWorldX: -0.5,
       hitAimVelocityX: -1.5,
@@ -797,6 +806,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingOffsetSeconds: 0,
       hitTimingGrade: 'PERFECT',
       hitTimingForwardMultiplier: 1,
+      hitTimingAccuracyMultiplier: 1,
       hitAimLateral: 0.5,
       hitAimWorldX: 0.5,
       hitAimVelocityX: 1.5,
@@ -820,6 +830,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingOffsetSeconds: -FIXED_STEP,
       hitTimingGrade: 'EARLY',
       hitTimingForwardMultiplier: 0.9,
+      hitTimingAccuracyMultiplier: 0.85,
       hitAimLateral: -0.75,
       hitAimWorldX: 0.75,
       hitAimVelocityX: 2.25,
@@ -894,6 +905,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       'VERY_LATE',
     ]
     const expectedMultipliers = [0.75, 0.9, 1, 0.9, 0.75]
+    const expectedAccuracyMultipliers = [0.6, 0.85, 1, 0.85, 0.6]
     const teamBResponses = offsets.map((offset) =>
       simulateResponse(offset, 'B'),
     )
@@ -920,6 +932,16 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
         (response) => response.hitTimingForwardMultiplier,
       ),
     ).toEqual(expectedMultipliers)
+    expect(
+      teamBResponses.map(
+        (response) => response.hitTimingAccuracyMultiplier,
+      ),
+    ).toEqual(expectedAccuracyMultipliers)
+    expect(
+      teamAResponses.map(
+        (response) => response.hitTimingAccuracyMultiplier,
+      ),
+    ).toEqual(expectedAccuracyMultipliers)
     expect(
       [...teamBResponses, ...teamAResponses].map(
         (response) => response.hitAimLateral,
@@ -1059,6 +1081,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingOffsetSeconds: -3 * FIXED_STEP,
       hitTimingGrade: 'EARLY',
       hitTimingForwardMultiplier: 0.9,
+      hitTimingAccuracyMultiplier: 0.85,
       hitAimLateral: 0,
       outgoingVelocity: {
         y: PLAYER_CONTACT_RESPONSE_CONFIG.upwardVelocity,

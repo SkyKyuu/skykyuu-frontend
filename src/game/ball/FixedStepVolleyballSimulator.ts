@@ -34,6 +34,7 @@ import {
   type PlayerHitTimingSample,
 } from '@/game/contact/playerHitTiming'
 import { classifyPlayerHitTiming } from '@/game/contact/playerHitTimingGrade'
+import { getPlayerHitTimingAccuracyMultiplier } from '@/game/contact/playerHitTimingAccuracy'
 import { getPlayerHitTimingForwardMultiplier } from '@/game/contact/playerHitTimingPower'
 
 const STEP_COMPARISON_EPSILON = 1e-12
@@ -170,6 +171,8 @@ export class FixedStepVolleyballSimulator {
         )
         const hitTimingForwardMultiplier =
           getPlayerHitTimingForwardMultiplier(hitTimingGrade)
+        const hitTimingAccuracyMultiplier =
+          getPlayerHitTimingAccuracyMultiplier(hitTimingGrade)
         const hitAimLateral = this.getResponseHitAimLateral(
           respondingTarget.playerId,
         )
@@ -197,6 +200,7 @@ export class FixedStepVolleyballSimulator {
           hitTiming,
           hitTimingGrade,
           hitTimingForwardMultiplier,
+          hitTimingAccuracyMultiplier,
           hitAimLateral,
           hitAimWorldX,
           hitAimVelocityX,
