@@ -135,6 +135,13 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
               3,
             )}
           </dd>
+          <dt>Hit Aim Forward</dt>
+          <dd>
+            {formatSignedValue(
+              snapshot.lastContactResponse.hitAimForward,
+              3,
+            )}
+          </dd>
           <dt>Hit Aim World X</dt>
           <dd>
             {formatSignedValue(

@@ -23,7 +23,10 @@ import {
   createPlayerBallContactResponseEvent,
 } from '@/game/contact/playerBallContactResponse'
 import { PLAYER_HIT_BUFFER_CONFIG } from '@/game/contact/playerHitBufferConfig'
-import { validatePlayerHitAimLateral } from '@/game/contact/playerHitAim'
+import {
+  validatePlayerHitAimForward,
+  validatePlayerHitAimLateral,
+} from '@/game/contact/playerHitAim'
 import {
   getPlayerHitAimVelocityX,
   playerHitAimLateralToWorldX,
@@ -71,6 +74,7 @@ export class FixedStepVolleyballSimulator {
   private hitBufferRemainingSecondsByPlayer = new Map<string, number>()
   private hitPressStepByPlayer = new Map<string, number>()
   private hitAimLateralByPlayer = new Map<string, number>()
+  private hitAimForwardByPlayer = new Map<string, number>()
   private contactEntryStepByPlayer = new Map<string, number>()
 
   constructor(initialState: VolleyballState) {
@@ -177,6 +181,9 @@ export class FixedStepVolleyballSimulator {
         const hitAimLateral = this.getResponseHitAimLateral(
           respondingTarget.playerId,
         )
+        const hitAimForward = this.getResponseHitAimForward(
+          respondingTarget.playerId,
+        )
         const respondingContact = createPlayerBallContactEvent(
           this.state,
           respondingTarget,
@@ -213,6 +220,7 @@ export class FixedStepVolleyballSimulator {
           hitTimingForwardMultiplier,
           hitTimingAccuracyMultiplier,
           hitAimLateral,
+          hitAimForward,
           hitAimWorldX,
           hitEffectiveAimLateral,
           hitEffectiveAimWorldX,
@@ -224,6 +232,7 @@ export class FixedStepVolleyballSimulator {
         )
         this.hitPressStepByPlayer.delete(respondingTarget.playerId)
         this.hitAimLateralByPlayer.delete(respondingTarget.playerId)
+        this.hitAimForwardByPlayer.delete(respondingTarget.playerId)
         events.push(responseEvent)
       }
 
@@ -250,6 +259,7 @@ export class FixedStepVolleyballSimulator {
       }
 
       const aimLateral = validatePlayerHitAimLateral(intent.aimLateral)
+      const aimForward = validatePlayerHitAimForward(intent.aimForward)
 
       const isConsumedOverlap =
         this.respondedPlayerContactIds.has(intent.playerId) &&
@@ -259,6 +269,7 @@ export class FixedStepVolleyballSimulator {
         this.hitBufferRemainingSecondsByPlayer.delete(intent.playerId)
         this.hitPressStepByPlayer.delete(intent.playerId)
         this.hitAimLateralByPlayer.delete(intent.playerId)
+        this.hitAimForwardByPlayer.delete(intent.playerId)
         continue
       }
 
@@ -271,6 +282,7 @@ export class FixedStepVolleyballSimulator {
         this.simulationStepCount,
       )
       this.hitAimLateralByPlayer.set(intent.playerId, aimLateral)
+      this.hitAimForwardByPlayer.set(intent.playerId, aimForward)
     }
   }
 
@@ -282,6 +294,7 @@ export class FixedStepVolleyballSimulator {
         this.hitBufferRemainingSecondsByPlayer.delete(target.playerId)
         this.hitPressStepByPlayer.delete(target.playerId)
         this.hitAimLateralByPlayer.delete(target.playerId)
+        this.hitAimForwardByPlayer.delete(target.playerId)
       }
     }
   }
@@ -295,6 +308,7 @@ export class FixedStepVolleyballSimulator {
         this.hitBufferRemainingSecondsByPlayer.delete(playerId)
         this.hitPressStepByPlayer.delete(playerId)
         this.hitAimLateralByPlayer.delete(playerId)
+        this.hitAimForwardByPlayer.delete(playerId)
       } else {
         this.hitBufferRemainingSecondsByPlayer.set(
           playerId,
@@ -308,6 +322,7 @@ export class FixedStepVolleyballSimulator {
     this.hitBufferRemainingSecondsByPlayer.clear()
     this.hitPressStepByPlayer.clear()
     this.hitAimLateralByPlayer.clear()
+    this.hitAimForwardByPlayer.clear()
   }
 
   private detectPlayerContacts(
@@ -386,6 +401,18 @@ export class FixedStepVolleyballSimulator {
     return aimLateral
   }
 
+  private getResponseHitAimForward(playerId: string): number {
+    const aimForward = this.hitAimForwardByPlayer.get(playerId)
+
+    if (aimForward === undefined) {
+      throw new Error(
+        `Missing hit aim forward for eligible player: ${playerId}`,
+      )
+    }
+
+    return aimForward
+  }
+
   reset(state: VolleyballState): void {
     this.state = copyVolleyballState(state)
     this.accumulatedSeconds = 0
@@ -396,6 +423,7 @@ export class FixedStepVolleyballSimulator {
     this.hitBufferRemainingSecondsByPlayer.clear()
     this.hitPressStepByPlayer.clear()
     this.hitAimLateralByPlayer.clear()
+    this.hitAimForwardByPlayer.clear()
     this.contactEntryStepByPlayer.clear()
   }
 }

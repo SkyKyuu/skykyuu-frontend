@@ -29,13 +29,15 @@ function createIntent(
     hitHeld = true,
     hitPressed = true,
     aimLateral = 0,
+    aimForward = 0,
   }: {
     hitHeld?: boolean
     hitPressed?: boolean
     aimLateral?: number
+    aimForward?: number
   } = {},
 ): PlayerHitIntent {
-  return { playerId, hitHeld, hitPressed, aimLateral }
+  return { playerId, hitHeld, hitPressed, aimLateral, aimForward }
 }
 
 function getResponseEvent(events: readonly BallSimulationEvent[]) {
@@ -112,6 +114,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingForwardMultiplier: 1,
       hitTimingAccuracyMultiplier: 1,
       hitAimLateral: 0,
+      hitAimForward: 0,
       hitAimWorldX: 0,
       hitEffectiveAimLateral: 0,
       hitEffectiveAimWorldX: 0,
@@ -198,6 +201,67 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
         hitEffectiveAimWorldX,
         hitAimVelocityX,
         outgoingVelocity: { x: outgoingX, y: 6.3, z: -4.5 },
+      })
+    },
+  )
+
+  it.each([-1, 0, 0.375, 1])(
+    'emits raw player-local forward aim %f without changing PERFECT physics',
+    (aimForward) => {
+      const simulator = new FixedStepVolleyballSimulator({
+        position: { x: 0, y: 1, z: 0 },
+        velocity: { x: 0.25, y: 0.5, z: 0.75 },
+      })
+
+      const response = getResponseEvent(
+        simulator.advance(
+          FIXED_STEP,
+          [createTarget('player-b', 'B')],
+          [
+            createIntent('player-b', {
+              aimLateral: 1,
+              aimForward,
+            }),
+          ],
+        ).events,
+      )
+
+      expect(response.hitAimForward).toBe(aimForward)
+      expect(response.outgoingVelocity).toEqual({
+        x: -2.75,
+        y: 6.3,
+        z: -5,
+      })
+    },
+  )
+
+  it.each([-1, 0, 1])(
+    'keeps EARLY F2.15 physics invariant for forward aim %f',
+    (aimForward) => {
+      const simulator = new FixedStepVolleyballSimulator({
+        position: { x: 0, y: 1, z: 0 },
+        velocity: { x: 0.25, y: 0.5, z: 0.75 },
+      })
+      const nearTarget = createTarget('player-b', 'B')
+      const farTarget = {
+        ...nearTarget,
+        position: { x: 10, y: 0, z: 0 },
+      }
+
+      simulator.advance(FIXED_STEP, [farTarget], [
+        createIntent('player-b', { aimLateral: 1, aimForward }),
+      ])
+      const response = getResponseEvent(
+        simulator.advance(FIXED_STEP, [nearTarget]).events,
+      )
+
+      expect(response).toMatchObject({
+        hitTimingGrade: 'EARLY',
+        hitTimingAccuracyMultiplier: 0.85,
+        hitAimLateral: 1,
+        hitAimForward: aimForward,
+        hitAimVelocityX: -2.55,
+        outgoingVelocity: { x: -2.3, y: 6.3, z: -4.5 },
       })
     },
   )
@@ -291,6 +355,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingForwardMultiplier: 0.9,
       hitTimingAccuracyMultiplier: 0.85,
       hitAimLateral: 0,
+      hitAimForward: 0,
       hitAimWorldX: 0,
       hitEffectiveAimLateral: 0,
       hitEffectiveAimWorldX: 0,
@@ -352,14 +417,19 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       simulator.advance(
         FIXED_STEP,
         [nearTarget],
-        [createIntent('player-b', { aimLateral: -1 })],
+        [
+          createIntent('player-b', {
+            aimLateral: -1,
+            aimForward: -1,
+          }),
+        ],
       ).events,
     ).toHaveLength(2)
     expect(
       simulator.advance(
         FIXED_STEP,
         [nearTarget],
-        [createIntent('player-b', { aimLateral: 1 })],
+        [createIntent('player-b', { aimLateral: 1, aimForward: 1 })],
       ).events,
     ).toEqual([])
 
@@ -387,7 +457,12 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       simulator.advance(
         FIXED_STEP,
         [nearTarget],
-        [createIntent('player-b', { aimLateral: -1 })],
+        [
+          createIntent('player-b', {
+            aimLateral: -1,
+            aimForward: -1,
+          }),
+        ],
       ).events.map((event) => event.type),
     ).toEqual(['PLAYER_CONTACT', 'PLAYER_CONTACT_RESPONSE'])
 
@@ -395,7 +470,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       simulator.advance(
         FIXED_STEP / 2,
         [nearTarget],
-        [createIntent('player-b', { aimLateral: 1 })],
+        [createIntent('player-b', { aimLateral: 1, aimForward: 1 })],
       ),
     ).toEqual({ executedSteps: 0, events: [] })
 
@@ -421,8 +496,14 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       ...nearTarget,
       position: { x: 10, y: 0, z: 0 },
     }
-    const firstIntent = createIntent('player-b', { aimLateral: -1 })
-    const nextIntent = createIntent('player-b', { aimLateral: 0.5 })
+    const firstIntent = createIntent('player-b', {
+      aimLateral: -1,
+      aimForward: 1,
+    })
+    const nextIntent = createIntent('player-b', {
+      aimLateral: 0.5,
+      aimForward: -0.25,
+    })
 
     expect(
       simulator.advance(FIXED_STEP, [nearTarget], [firstIntent]).events,
@@ -444,6 +525,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingForwardMultiplier: 0.9,
       hitTimingAccuracyMultiplier: 0.85,
       hitAimLateral: 0.5,
+      hitAimForward: -0.25,
       hitAimWorldX: -0.5,
       hitEffectiveAimLateral: 0.425,
       hitEffectiveAimWorldX: -0.425,
@@ -467,7 +549,12 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       simulator.advance(
         FIXED_STEP,
         [farTarget],
-        [createIntent('player-b', { aimLateral: -0.75 })],
+        [
+          createIntent('player-b', {
+            aimLateral: -0.75,
+            aimForward: 0.375,
+          }),
+        ],
       ).events,
     ).toEqual([])
     const responseResult = simulator.advance(FIXED_STEP, [nearTarget])
@@ -489,6 +576,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingForwardMultiplier: 0.9,
       hitTimingAccuracyMultiplier: 0.85,
       hitAimLateral: -0.75,
+      hitAimForward: 0.375,
       hitAimWorldX: 0.75,
       hitEffectiveAimLateral: -0.6375,
       hitEffectiveAimWorldX: 0.6375,
@@ -511,17 +599,18 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     }
 
     simulator.advance(FIXED_STEP, [farTarget], [
-      createIntent('player-b', { aimLateral: -1 }),
+      createIntent('player-b', { aimLateral: -1, aimForward: 1 }),
     ])
     simulator.advance(FIXED_STEP, [farTarget], [
       createIntent('player-b', {
         hitHeld: false,
         hitPressed: false,
         aimLateral: 0,
+        aimForward: 0,
       }),
     ])
     simulator.advance(FIXED_STEP, [farTarget], [
-      createIntent('player-b', { aimLateral: 1 }),
+      createIntent('player-b', { aimLateral: 0.5, aimForward: -0.5 }),
     ])
 
     const response = getResponseEvent(
@@ -531,12 +620,13 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(response).toMatchObject({
       hitTimingOffsetSteps: -1,
       hitTimingOffsetSeconds: -FIXED_STEP,
-      hitAimLateral: 1,
-      hitAimWorldX: -1,
-      hitEffectiveAimLateral: 0.85,
-      hitEffectiveAimWorldX: -0.85,
-      hitAimVelocityX: -2.55,
-      outgoingVelocity: { x: -2.55 },
+      hitAimLateral: 0.5,
+      hitAimForward: -0.5,
+      hitAimWorldX: -0.5,
+      hitEffectiveAimLateral: 0.425,
+      hitEffectiveAimWorldX: -0.425,
+      hitAimVelocityX: -1.275,
+      outgoingVelocity: { x: -1.275 },
     })
   })
 
@@ -564,6 +654,58 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     )
   })
 
+  it('throws a player-specific invariant error when eligible forward aim is missing', () => {
+    const simulator = new FixedStepVolleyballSimulator({
+      position: { x: 0, y: 1, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+    })
+    const nearTarget = createTarget('player-b', 'B')
+    const farTarget = {
+      ...nearTarget,
+      position: { x: 10, y: 0, z: 0 },
+    }
+
+    simulator.advance(0, [farTarget], [
+      createIntent('player-b', { aimForward: 0.5 }),
+    ])
+    const internalAimState = simulator as unknown as {
+      hitAimForwardByPlayer: Map<string, number>
+    }
+    internalAimState.hitAimForwardByPlayer.delete('player-b')
+
+    expect(() => simulator.advance(FIXED_STEP, [nearTarget])).toThrow(
+      'Missing hit aim forward for eligible player: player-b',
+    )
+  })
+
+  it('does not partially arm a hit when forward aim validation fails', () => {
+    const simulator = new FixedStepVolleyballSimulator({
+      position: { x: 0, y: 1, z: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+    })
+    const farTarget = createTarget('player-b', 'B', 10)
+    const internalHitState = simulator as unknown as {
+      hitBufferRemainingSecondsByPlayer: Map<string, number>
+      hitPressStepByPlayer: Map<string, number>
+      hitAimLateralByPlayer: Map<string, number>
+      hitAimForwardByPlayer: Map<string, number>
+    }
+
+    expect(() =>
+      simulator.advance(0, [farTarget], [
+        createIntent('player-b', {
+          aimLateral: 0.5,
+          aimForward: Number.NaN,
+        }),
+      ]),
+    ).toThrow('Player hit aim forward must be finite and between -1 and 1')
+
+    expect(internalHitState.hitBufferRemainingSecondsByPlayer.size).toBe(0)
+    expect(internalHitState.hitPressStepByPlayer.size).toBe(0)
+    expect(internalHitState.hitAimLateralByPlayer.size).toBe(0)
+    expect(internalHitState.hitAimForwardByPlayer.size).toBe(0)
+  })
+
   it('keeps a buffered hit active across several fixed steps inside the window', () => {
     const simulator = new FixedStepVolleyballSimulator({
       position: { x: 0, y: 1, z: 0 },
@@ -579,12 +721,18 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitHeld: true,
       hitPressed: false,
       aimLateral: 1,
+      aimForward: -1,
     })
 
     simulator.advance(
       FIXED_STEP,
       [farTarget],
-      [createIntent('player-b', { aimLateral: -1 })],
+      [
+        createIntent('player-b', {
+          aimLateral: -1,
+          aimForward: 1,
+        }),
+      ],
     )
     simulator.advance(FIXED_STEP, [farTarget], [heldOnlyWithChangedAim])
     simulator.advance(FIXED_STEP, [farTarget], [heldOnlyWithChangedAim])
@@ -605,6 +753,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingGrade: 'EARLY',
       hitTimingForwardMultiplier: 0.9,
       hitAimLateral: -1,
+      hitAimForward: 1,
       hitAimWorldX: 1,
       hitEffectiveAimLateral: -0.85,
       hitEffectiveAimWorldX: 0.85,
@@ -665,7 +814,12 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     simulator.advance(
       FIXED_STEP,
       [farTarget],
-      [createIntent('player-b', { aimLateral: -1 })],
+      [
+        createIntent('player-b', {
+          aimLateral: -1,
+          aimForward: 1,
+        }),
+      ],
     )
 
     for (let step = 0; step < 5; step += 1) {
@@ -680,13 +834,17 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
 
     simulator.advance(FIXED_STEP, [farTarget])
     simulator.advance(FIXED_STEP, [farTarget], [
-      createIntent('player-b', { aimLateral: 0.5 }),
+      createIntent('player-b', {
+        aimLateral: 0.5,
+        aimForward: -0.375,
+      }),
     ])
     const newResponse = simulator.advance(FIXED_STEP, [nearTarget])
 
     expect(getResponseEvent(newResponse.events)).toMatchObject({
       hitTimingOffsetSteps: -1,
       hitAimLateral: 0.5,
+      hitAimForward: -0.375,
       hitAimWorldX: -0.5,
       hitEffectiveAimLateral: 0.425,
       hitEffectiveAimWorldX: -0.425,
@@ -737,7 +895,10 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
 
     expect(
       simulator.advance(delta, [target], [
-        createIntent('player-b', { aimLateral: 0.5 }),
+        createIntent('player-b', {
+          aimLateral: 0.5,
+          aimForward: 0.5,
+        }),
       ]),
     ).toEqual({ executedSteps: 0, events: [] })
     const responseResult = simulator.advance(FIXED_STEP, [target])
@@ -753,6 +914,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingForwardMultiplier: 1,
       hitTimingAccuracyMultiplier: 1,
       hitAimLateral: 0.5,
+      hitAimForward: 0.5,
       hitAimWorldX: -0.5,
       hitEffectiveAimLateral: 0.5,
       hitEffectiveAimWorldX: -0.5,
@@ -770,9 +932,17 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     const target = createTarget('player-b', 'B')
 
     simulator.advance(0, [target], [
-      createIntent('player-b', { aimLateral: 0.75 }),
+      createIntent('player-b', {
+        aimLateral: 0.75,
+        aimForward: 0.75,
+      }),
     ])
     simulator.reset(state)
+
+    const internalAimState = simulator as unknown as {
+      hitAimForwardByPlayer: Map<string, number>
+    }
+    expect(internalAimState.hitAimForwardByPlayer.size).toBe(0)
 
     expect(
       simulator.advance(FIXED_STEP, [target]).events.map(
@@ -811,13 +981,21 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     }))
 
     simulator.advance(FIXED_STEP, farTargets, [
-      createIntent('second-player', { aimLateral: -0.75 }),
+      createIntent('second-player', {
+        aimLateral: -0.75,
+        aimForward: -0.25,
+      }),
     ])
 
     const result = simulator.advance(
       FIXED_STEP,
       [firstTarget, secondTarget],
-      [createIntent('first-player', { aimLateral: 0.5 })],
+      [
+        createIntent('first-player', {
+          aimLateral: 0.5,
+          aimForward: 1,
+        }),
+      ],
     )
 
     expect(result.events.map((event) => event.type)).toEqual([
@@ -835,6 +1013,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingForwardMultiplier: 1,
       hitTimingAccuracyMultiplier: 1,
       hitAimLateral: 0.5,
+      hitAimForward: 1,
       hitAimWorldX: 0.5,
       hitEffectiveAimLateral: 0.5,
       hitEffectiveAimWorldX: 0.5,
@@ -861,6 +1040,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitTimingForwardMultiplier: 0.9,
       hitTimingAccuracyMultiplier: 0.85,
       hitAimLateral: -0.75,
+      hitAimForward: -0.25,
       hitAimWorldX: 0.75,
       hitEffectiveAimLateral: -0.6375,
       hitEffectiveAimWorldX: 0.6375,
@@ -1034,7 +1214,10 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     const target = createTarget('ground-player', 'B')
 
     simulator.advance(0, [target], [
-      createIntent('ground-player', { aimLateral: 0.8 }),
+      createIntent('ground-player', {
+        aimLateral: 0.8,
+        aimForward: 0.5,
+      }),
     ])
 
     const result = simulator.advance(FIXED_STEP, [target])
@@ -1045,6 +1228,10 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     ])
     expect(simulator.getState().position.y).toBe(VOLLEYBALL_CONFIG.radius)
     expect(simulator.getState().velocity.y).toBeLessThan(0)
+    const internalAimState = simulator as unknown as {
+      hitAimForwardByPlayer: Map<string, number>
+    }
+    expect(internalAimState.hitAimForwardByPlayer.size).toBe(0)
   })
 
   it('runs the no-hit preview through Team B contact to an IN side-B landing', () => {
