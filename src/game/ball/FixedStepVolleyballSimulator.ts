@@ -35,6 +35,7 @@ import {
 } from '@/game/contact/playerHitTiming'
 import { classifyPlayerHitTiming } from '@/game/contact/playerHitTimingGrade'
 import { getPlayerHitTimingAccuracyMultiplier } from '@/game/contact/playerHitTimingAccuracy'
+import { getPlayerHitTimingEffectiveAimLateral } from '@/game/contact/playerHitTimingAccuracyAim'
 import { getPlayerHitTimingForwardMultiplier } from '@/game/contact/playerHitTimingPower'
 
 const STEP_COMPARISON_EPSILON = 1e-12
@@ -184,15 +185,25 @@ export class FixedStepVolleyballSimulator {
           respondingContact.teamSide,
           hitAimLateral,
         )
+        const hitEffectiveAimLateral =
+          getPlayerHitTimingEffectiveAimLateral(
+            hitAimLateral,
+            hitTimingAccuracyMultiplier,
+          )
+        const hitEffectiveAimWorldX = playerHitAimLateralToWorldX(
+          respondingContact.teamSide,
+          hitEffectiveAimLateral,
+        )
         const hitAimVelocityX = getPlayerHitAimVelocityX(
           respondingContact.teamSide,
-          hitAimLateral,
+          hitEffectiveAimLateral,
         )
         this.state = applyPlayerContactResponse(
           this.state,
           respondingContact,
           hitTimingGrade,
           hitAimLateral,
+          hitTimingAccuracyMultiplier,
         )
         const responseEvent = createPlayerBallContactResponseEvent(
           respondingContact,
@@ -203,6 +214,8 @@ export class FixedStepVolleyballSimulator {
           hitTimingAccuracyMultiplier,
           hitAimLateral,
           hitAimWorldX,
+          hitEffectiveAimLateral,
+          hitEffectiveAimWorldX,
           hitAimVelocityX,
         )
         this.respondedPlayerContactIds.add(respondingTarget.playerId)

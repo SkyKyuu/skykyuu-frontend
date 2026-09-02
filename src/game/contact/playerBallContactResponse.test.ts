@@ -19,13 +19,28 @@ const CONTACT: PlayerBallContactEvent = {
 }
 
 const TIMING_POWER_CASES = [
-  ['VERY_EARLY', 0.75, 3.75],
-  ['EARLY', 0.9, 4.5],
-  ['PERFECT', 1, 5],
-  ['LATE', 0.9, 4.5],
-  ['VERY_LATE', 0.75, 3.75],
+  ['VERY_EARLY', 0.75, 0.6, 3.75],
+  ['EARLY', 0.9, 0.85, 4.5],
+  ['PERFECT', 1, 1, 5],
+  ['LATE', 0.9, 0.85, 4.5],
+  ['VERY_LATE', 0.75, 0.6, 3.75],
 ] as const satisfies readonly (readonly [
   PlayerHitTimingGrade,
+  number,
+  number,
+  number,
+])[]
+
+const TIMING_ACCURACY_CASES = [
+  ['VERY_EARLY', 0.6, 2.05, -1.55, -3.75],
+  ['EARLY', 0.85, 2.8, -2.3, -4.5],
+  ['PERFECT', 1, 3.25, -2.75, -5],
+  ['LATE', 0.85, 2.8, -2.3, -4.5],
+  ['VERY_LATE', 0.6, 2.05, -1.55, -3.75],
+] as const satisfies readonly (readonly [
+  PlayerHitTimingGrade,
+  number,
+  number,
   number,
   number,
 ])[]
@@ -33,11 +48,17 @@ const TIMING_POWER_CASES = [
 describe('player contact response math', () => {
   it.each(TIMING_POWER_CASES)(
     'applies %s power x%f to Team A forward velocity',
-    (grade, _multiplier, expectedForwardVelocity) => {
+    (grade, _powerMultiplier, accuracyMultiplier, expectedForwardVelocity) => {
       const incomingVelocity = { x: 1, y: -2, z: 3 }
 
       expect(
-        getPlayerContactResponseVelocity(incomingVelocity, 'A', grade, 0),
+        getPlayerContactResponseVelocity(
+          incomingVelocity,
+          'A',
+          grade,
+          0,
+          accuracyMultiplier,
+        ),
       ).toEqual({
         x: 1,
         y: PLAYER_CONTACT_RESPONSE_CONFIG.upwardVelocity,
@@ -49,13 +70,14 @@ describe('player contact response math', () => {
 
   it.each(TIMING_POWER_CASES)(
     'applies %s power x%f to Team B forward velocity',
-    (grade, _multiplier, expectedForwardVelocity) => {
+    (grade, _powerMultiplier, accuracyMultiplier, expectedForwardVelocity) => {
       expect(
         getPlayerContactResponseVelocity(
           { x: 1, y: -2, z: 3 },
           'B',
           grade,
           0,
+          accuracyMultiplier,
         ),
       ).toEqual({
         x: 1,
@@ -72,6 +94,7 @@ describe('player contact response math', () => {
         'A',
         'PERFECT',
         0,
+        1,
       ),
     ).toEqual({ x: 0.25, y: 6.3, z: 5 })
     expect(
@@ -80,6 +103,7 @@ describe('player contact response math', () => {
         'B',
         'PERFECT',
         0,
+        1,
       ),
     ).toEqual({ x: 0.25, y: 6.3, z: -5 })
   })
@@ -97,6 +121,7 @@ describe('player contact response math', () => {
           'A',
           'PERFECT',
           aimLateral,
+          1,
         ),
       ).toEqual({ x: expectedX, y: 6.3, z: 5 })
     },
@@ -115,6 +140,7 @@ describe('player contact response math', () => {
           'B',
           'PERFECT',
           aimLateral,
+          1,
         ),
       ).toEqual({ x: expectedX, y: 6.3, z: -5 })
     },
@@ -127,27 +153,58 @@ describe('player contact response math', () => {
         'A',
         'PERFECT',
         0.5,
+        1,
       ),
     ).toEqual({ x: 1.75, y: 6.3, z: 5 })
   })
 
-  it.each([
-    ['EARLY', -4.5],
-    ['PERFECT', -5],
-    ['VERY_EARLY', -3.75],
-  ] as const)(
-    'keeps Team B aim X independent from %s forward timing power',
-    (grade, expectedZ) => {
-      expect(
-        getPlayerContactResponseVelocity(
-          { x: 0.25, y: -2, z: 3 },
-          'B',
-          grade,
-          1,
-        ),
-      ).toEqual({ x: -2.75, y: 6.3, z: expectedZ })
+  it.each(TIMING_ACCURACY_CASES)(
+    'applies %s accuracy x%f only to Team A hit-created lateral contribution',
+    (grade, accuracy, expectedX, _expectedTeamBX, expectedTeamBZ) => {
+      const response = getPlayerContactResponseVelocity(
+        { x: 0.25, y: -2, z: 3 },
+        'A',
+        grade,
+        1,
+        accuracy,
+      )
+
+      expect(response.x).toBeCloseTo(expectedX)
+      expect(response.y).toBe(6.3)
+      expect(response.z).toBe(-expectedTeamBZ)
     },
   )
+
+  it.each(TIMING_ACCURACY_CASES)(
+    'applies %s accuracy x%f to Team B aim while keeping Vz on timing power',
+    (grade, accuracy, _expectedTeamAX, expectedX, expectedZ) => {
+      const response = getPlayerContactResponseVelocity(
+        { x: 0.25, y: -2, z: 3 },
+        'B',
+        grade,
+        1,
+        accuracy,
+      )
+
+      expect(response.x).toBeCloseTo(expectedX)
+      expect(response.y).toBe(6.3)
+      expect(response.z).toBe(expectedZ)
+    },
+  )
+
+  it('preserves incoming lateral momentum instead of scaling it by accuracy', () => {
+    const response = getPlayerContactResponseVelocity(
+      { x: 2, y: -2, z: 3 },
+      'B',
+      'EARLY',
+      1,
+      0.85,
+    )
+
+    expect(response.x).toBeCloseTo(-0.55)
+    expect(response.y).toBe(6.3)
+    expect(response.z).toBe(-4.5)
+  })
 
   it('preserves position and leaves source state and contact immutable', () => {
     const state = {
@@ -157,7 +214,13 @@ describe('player contact response math', () => {
     const originalState = structuredClone(state)
     const originalContact = structuredClone(CONTACT)
 
-    const nextState = applyPlayerContactResponse(state, CONTACT, 'EARLY', 0)
+    const nextState = applyPlayerContactResponse(
+      state,
+      CONTACT,
+      'EARLY',
+      0,
+      0.85,
+    )
 
     expect(nextState).toEqual({
       position: state.position,
@@ -175,7 +238,7 @@ describe('player contact response math', () => {
 
   it('copies the incoming and outgoing values into a response event', () => {
     const contact = structuredClone(CONTACT)
-    const outgoingVelocity = { x: 6.25, y: 6.3, z: -4.5 }
+    const outgoingVelocity = { x: 5.9125, y: 6.3, z: -4.5 }
     const hitTiming = {
       offsetSteps: -2,
       offsetSeconds:
@@ -190,7 +253,9 @@ describe('player contact response math', () => {
       0.85,
       -0.75,
       0.75,
-      2.25,
+      -0.6375,
+      0.6375,
+      1.9124999999999999,
     )
 
     contact.ballPosition.x = 99
@@ -204,7 +269,7 @@ describe('player contact response math', () => {
       teamSide: 'B',
       ballPosition: { x: 1, y: 2, z: 3 },
       incomingVelocity: { x: 4, y: -3, z: 5 },
-      outgoingVelocity: { x: 6.25, y: 6.3, z: -4.5 },
+      outgoingVelocity: { x: 5.9125, y: 6.3, z: -4.5 },
       hitTimingOffsetSteps: -2,
       hitTimingOffsetSeconds:
         -2 * VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds,
@@ -213,7 +278,9 @@ describe('player contact response math', () => {
       hitTimingAccuracyMultiplier: 0.85,
       hitAimLateral: -0.75,
       hitAimWorldX: 0.75,
-      hitAimVelocityX: 2.25,
+      hitEffectiveAimLateral: -0.6375,
+      hitEffectiveAimWorldX: 0.6375,
+      hitAimVelocityX: 1.9124999999999999,
     })
   })
 })

@@ -7,6 +7,7 @@ import { PLAYER_CONTACT_RESPONSE_CONFIG } from '@/game/contact/playerBallContact
 import { getPlayerHitAimVelocityX } from '@/game/contact/playerHitAimMath'
 import type { PlayerHitTimingSample } from '@/game/contact/playerHitTiming'
 import type { PlayerHitTimingGrade } from '@/game/contact/playerHitTimingGrade'
+import { getPlayerHitTimingEffectiveAimLateral } from '@/game/contact/playerHitTimingAccuracyAim'
 import { getPlayerHitTimingForwardMultiplier } from '@/game/contact/playerHitTimingPower'
 import type { TeamSide } from '@/game/team/teamTypes'
 
@@ -26,6 +27,10 @@ export interface PlayerBallContactResponseEvent {
   hitAimLateral: number
   /** Player-local lateral aim converted to world X. */
   hitAimWorldX: number
+  /** Player-local lateral aim after timing accuracy is applied. */
+  hitEffectiveAimLateral: number
+  /** Accuracy-adjusted lateral aim converted to world X. */
+  hitEffectiveAimWorldX: number
   /** Lateral velocity contribution applied to the incoming ball velocity. */
   hitAimVelocityX: number
 }
@@ -35,11 +40,19 @@ export function getPlayerContactResponseVelocity(
   teamSide: TeamSide,
   hitTimingGrade: PlayerHitTimingGrade,
   hitAimLateral: number,
+  hitTimingAccuracyMultiplier: number,
 ): BallVector3 {
   const forwardMagnitude =
     PLAYER_CONTACT_RESPONSE_CONFIG.forwardVelocity *
     getPlayerHitTimingForwardMultiplier(hitTimingGrade)
-  const aimVelocityX = getPlayerHitAimVelocityX(teamSide, hitAimLateral)
+  const hitEffectiveAimLateral = getPlayerHitTimingEffectiveAimLateral(
+    hitAimLateral,
+    hitTimingAccuracyMultiplier,
+  )
+  const aimVelocityX = getPlayerHitAimVelocityX(
+    teamSide,
+    hitEffectiveAimLateral,
+  )
 
   return {
     x: incomingVelocity.x + aimVelocityX,
@@ -53,6 +66,7 @@ export function applyPlayerContactResponse(
   playerContact: PlayerBallContactEvent,
   hitTimingGrade: PlayerHitTimingGrade,
   hitAimLateral: number,
+  hitTimingAccuracyMultiplier: number,
 ): VolleyballState {
   return {
     position: { ...state.position },
@@ -61,6 +75,7 @@ export function applyPlayerContactResponse(
       playerContact.teamSide,
       hitTimingGrade,
       hitAimLateral,
+      hitTimingAccuracyMultiplier,
     ),
   }
 }
@@ -74,6 +89,8 @@ export function createPlayerBallContactResponseEvent(
   hitTimingAccuracyMultiplier: number,
   hitAimLateral: number,
   hitAimWorldX: number,
+  hitEffectiveAimLateral: number,
+  hitEffectiveAimWorldX: number,
   hitAimVelocityX: number,
 ): PlayerBallContactResponseEvent {
   return {
@@ -90,6 +107,8 @@ export function createPlayerBallContactResponseEvent(
     hitTimingAccuracyMultiplier,
     hitAimLateral,
     hitAimWorldX,
+    hitEffectiveAimLateral,
+    hitEffectiveAimWorldX,
     hitAimVelocityX,
   }
 }
