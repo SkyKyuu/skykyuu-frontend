@@ -1,6 +1,6 @@
 import type { PlayerHitTimingGrade } from '@/game/contact/playerHitTimingGrade'
 
-// Initial temporary gameplay contract; it does not affect ball physics yet.
+// Initial gameplay tuning; F2.15 applies it only to lateral aim fidelity.
 export const PLAYER_HIT_TIMING_ACCURACY_CONFIG = {
   VERY_EARLY: 0.6,
   EARLY: 0.85,

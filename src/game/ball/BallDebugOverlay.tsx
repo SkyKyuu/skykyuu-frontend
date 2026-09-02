@@ -128,12 +128,6 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
               snapshot.lastContactResponse.hitTimingForwardMultiplier,
             )}
           </dd>
-          <dt>Timing Accuracy x</dt>
-          <dd>
-            {formatValue(
-              snapshot.lastContactResponse.hitTimingAccuracyMultiplier,
-            )}
-          </dd>
           <dt>Hit Aim Lateral</dt>
           <dd>
             {formatSignedValue(
@@ -145,6 +139,26 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
           <dd>
             {formatSignedValue(
               snapshot.lastContactResponse.hitAimWorldX,
+              3,
+            )}
+          </dd>
+          <dt>Timing Accuracy x</dt>
+          <dd>
+            {formatValue(
+              snapshot.lastContactResponse.hitTimingAccuracyMultiplier,
+            )}
+          </dd>
+          <dt>Effective Aim Lateral</dt>
+          <dd>
+            {formatSignedValue(
+              snapshot.lastContactResponse.hitEffectiveAimLateral,
+              3,
+            )}
+          </dd>
+          <dt>Effective Aim World X</dt>
+          <dd>
+            {formatSignedValue(
+              snapshot.lastContactResponse.hitEffectiveAimWorldX,
               3,
             )}
           </dd>
