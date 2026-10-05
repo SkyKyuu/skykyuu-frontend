@@ -26,6 +26,37 @@ describe('BallDebugOverlay forward telemetry', () => {
       lastLanding: null, lastPlayerContact: null, lastContactResponse: event,
     }} />)
     expect(screen.getByText('Hit Aim Forward (local)').nextElementSibling).toHaveTextContent(expected)
+    expect(screen.getByText('Effective Aim Forward').nextElementSibling).toHaveTextContent(expected)
+    expect(screen.getByText('Effective Aim World Z').nextElementSibling).toHaveTextContent(expected)
     expect(screen.queryByText(/Hit Aim World Z/)).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['A', 1, '+1.000', '+0.850', '+0.850'],
+    ['B', 1, '+1.000', '+0.850', '-0.850'],
+    ['B', -1, '-1.000', '-0.850', '+0.850'],
+    ['A', Math.SQRT1_2, '+0.707', '+0.601', '+0.601'],
+  ] as const)('displays EARLY Team %s forward %s fidelity', (teamSide, aimForward, raw, effective, worldZ) => {
+    const simulator = new FixedStepVolleyballSimulator({
+      position: { x: 0, y: 1, z: 0 }, velocity: { x: 0, y: 0, z: 0 },
+    })
+    const step = VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds
+    simulator.advance(step, [], [
+      { playerId: 'player', hitHeld: true, hitPressed: true, aimLateral: 0, aimForward },
+    ])
+    const result = simulator.advance(step, [
+      { playerId: 'player', teamSide, position: { x: 0, y: 0, z: 0 } },
+    ])
+    const event = result.events.find((event) => event.type === 'PLAYER_CONTACT_RESPONSE')
+    if (!event || event.type !== 'PLAYER_CONTACT_RESPONSE') throw new Error('Missing response')
+    render(<BallDebugOverlay snapshot={{
+      ...simulator.getState(), accumulatorSeconds: simulator.accumulatorSeconds,
+      totalSimulationSteps: simulator.totalSimulationSteps,
+      lastLanding: null, lastPlayerContact: null, lastContactResponse: event,
+    }} />)
+    expect(screen.getByText('Hit Aim Forward (local)').nextElementSibling).toHaveTextContent(raw)
+    expect(screen.getByText('Effective Aim Forward').nextElementSibling).toHaveTextContent(effective)
+    expect(screen.getByText('Effective Aim World Z').nextElementSibling).toHaveTextContent(worldZ)
+    expect(screen.queryByText(/Aim Vz Contribution/)).not.toBeInTheDocument()
   })
 })

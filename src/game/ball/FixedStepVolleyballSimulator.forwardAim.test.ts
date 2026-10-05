@@ -46,11 +46,14 @@ describe('forward hit aim intent buffer', () => {
     const neutral = new FixedStepVolleyballSimulator(INITIAL)
     const neutralEvent = response(neutral.advance(STEP, [target('player', team)], [intent(0)]))
     expect(event.hitAimForward).toBe(forward)
-    expect({ ...event, hitAimForward: 0 }).toEqual(neutralEvent)
+    expect({
+      ...event, hitAimForward: 0,
+      hitEffectiveAimForward: 0, hitEffectiveAimWorldZ: 0,
+    }).toEqual(neutralEvent)
     expect(simulator.getState()).toEqual(neutral.getState())
     expect(pendingForward(simulator).size).toBe(0)
     expect(event).not.toHaveProperty('hitAimWorldZ')
-    expect(event).not.toHaveProperty('hitEffectiveAimForward')
+    expect(event.hitEffectiveAimForward).toBe(forward)
     expect(event).not.toHaveProperty('hitAimVelocityZ')
   })
 

@@ -4,10 +4,16 @@ import type {
 } from '@/game/ball/volleyballState'
 import type { PlayerBallContactEvent } from '@/game/contact/playerBallContact'
 import { PLAYER_CONTACT_RESPONSE_CONFIG } from '@/game/contact/playerBallContactResponseConfig'
-import { getPlayerHitAimVelocityX } from '@/game/contact/playerHitAimMath'
+import {
+  getPlayerHitAimVelocityX,
+  playerHitAimForwardToWorldZ,
+} from '@/game/contact/playerHitAimMath'
 import type { PlayerHitTimingSample } from '@/game/contact/playerHitTiming'
 import type { PlayerHitTimingGrade } from '@/game/contact/playerHitTimingGrade'
-import { getPlayerHitTimingEffectiveAimLateral } from '@/game/contact/playerHitTimingAccuracyAim'
+import {
+  getPlayerHitTimingEffectiveAimLateral,
+  getPlayerHitTimingEffectiveAimForward,
+} from '@/game/contact/playerHitTimingAccuracyAim'
 import { getPlayerHitTimingForwardMultiplier } from '@/game/contact/playerHitTimingPower'
 import type { TeamSide } from '@/game/team/teamTypes'
 
@@ -27,6 +33,10 @@ export interface PlayerBallContactResponseEvent {
   hitAimLateral: number
   /** Raw player-local forward aim captured at hit press; telemetry only. */
   hitAimForward: number
+  /** Accuracy-adjusted player-local forward intention; telemetry only. */
+  hitEffectiveAimForward: number
+  /** Effective forward intention converted to world Z; telemetry only. */
+  hitEffectiveAimWorldZ: number
   /** Player-local lateral aim converted to world X. */
   hitAimWorldX: number
   /** Player-local lateral aim after timing accuracy is applied. */
@@ -96,6 +106,11 @@ export function createPlayerBallContactResponseEvent(
   hitAimVelocityX: number,
   hitAimForward: number,
 ): PlayerBallContactResponseEvent {
+  const hitEffectiveAimForward = getPlayerHitTimingEffectiveAimForward(
+    hitAimForward,
+    hitTimingAccuracyMultiplier,
+  )
+
   return {
     type: 'PLAYER_CONTACT_RESPONSE',
     playerId: playerContact.playerId,
@@ -110,6 +125,11 @@ export function createPlayerBallContactResponseEvent(
     hitTimingAccuracyMultiplier,
     hitAimLateral,
     hitAimForward,
+    hitEffectiveAimForward,
+    hitEffectiveAimWorldZ: playerHitAimForwardToWorldZ(
+      playerContact.teamSide,
+      hitEffectiveAimForward,
+    ),
     hitAimWorldX,
     hitEffectiveAimLateral,
     hitEffectiveAimWorldX,

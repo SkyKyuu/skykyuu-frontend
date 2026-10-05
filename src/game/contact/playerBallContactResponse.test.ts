@@ -279,6 +279,8 @@ describe('player contact response math', () => {
       hitTimingAccuracyMultiplier: 0.85,
       hitAimLateral: -0.75,
       hitAimForward: 0.5,
+      hitEffectiveAimForward: 0.425,
+      hitEffectiveAimWorldZ: -0.425,
       hitAimWorldX: 0.75,
       hitEffectiveAimLateral: -0.6375,
       hitEffectiveAimWorldX: 0.6375,

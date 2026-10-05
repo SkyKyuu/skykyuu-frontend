@@ -142,6 +142,20 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
               3,
             )}
           </dd>
+          <dt>Effective Aim Forward</dt>
+          <dd>
+            {formatSignedValue(
+              snapshot.lastContactResponse.hitEffectiveAimForward,
+              3,
+            )}
+          </dd>
+          <dt>Effective Aim World Z</dt>
+          <dd>
+            {formatSignedValue(
+              snapshot.lastContactResponse.hitEffectiveAimWorldZ,
+              3,
+            )}
+          </dd>
           <dt>Hit Aim World X</dt>
           <dd>
             {formatSignedValue(

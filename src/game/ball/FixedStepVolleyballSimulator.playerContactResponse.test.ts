@@ -278,6 +278,8 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     expect(hit.events).toHaveLength(1)
     expect(hit.events[0]).toEqual({
       hitAimForward: 0,
+      hitEffectiveAimForward: 0,
+      hitEffectiveAimWorldZ: 0,
       type: 'PLAYER_CONTACT_RESPONSE',
       playerId: 'player-b',
       teamSide: 'B',
