@@ -25,6 +25,8 @@ export interface PlayerBallContactResponseEvent {
   hitTimingAccuracyMultiplier: number
   /** Player-local lateral aim captured at hit press; not world X. */
   hitAimLateral: number
+  /** Raw player-local forward aim captured at hit press; telemetry only. */
+  hitAimForward: number
   /** Player-local lateral aim converted to world X. */
   hitAimWorldX: number
   /** Player-local lateral aim after timing accuracy is applied. */
@@ -92,6 +94,7 @@ export function createPlayerBallContactResponseEvent(
   hitEffectiveAimLateral: number,
   hitEffectiveAimWorldX: number,
   hitAimVelocityX: number,
+  hitAimForward: number,
 ): PlayerBallContactResponseEvent {
   return {
     type: 'PLAYER_CONTACT_RESPONSE',
@@ -106,6 +109,7 @@ export function createPlayerBallContactResponseEvent(
     hitTimingForwardMultiplier,
     hitTimingAccuracyMultiplier,
     hitAimLateral,
+    hitAimForward,
     hitAimWorldX,
     hitEffectiveAimLateral,
     hitEffectiveAimWorldX,
