@@ -29,13 +29,15 @@ function createIntent(
     hitHeld = true,
     hitPressed = true,
     aimLateral = 0,
+    aimForward = 0,
   }: {
     hitHeld?: boolean
     hitPressed?: boolean
     aimLateral?: number
+    aimForward?: number
   } = {},
 ): PlayerHitIntent {
-  return { playerId, hitHeld, hitPressed, aimLateral }
+  return { playerId, hitHeld, hitPressed, aimLateral, aimForward }
 }
 
 function getResponseEvent(events: readonly BallSimulationEvent[]) {
@@ -275,6 +277,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
     ])
     expect(hit.events).toHaveLength(1)
     expect(hit.events[0]).toEqual({
+      hitAimForward: 0,
       type: 'PLAYER_CONTACT_RESPONSE',
       playerId: 'player-b',
       teamSide: 'B',

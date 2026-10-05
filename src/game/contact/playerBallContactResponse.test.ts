@@ -256,6 +256,7 @@ describe('player contact response math', () => {
       -0.6375,
       0.6375,
       1.9124999999999999,
+      0.5,
     )
 
     contact.ballPosition.x = 99
@@ -277,6 +278,7 @@ describe('player contact response math', () => {
       hitTimingForwardMultiplier: 0.9,
       hitTimingAccuracyMultiplier: 0.85,
       hitAimLateral: -0.75,
+      hitAimForward: 0.5,
       hitAimWorldX: 0.75,
       hitEffectiveAimLateral: -0.6375,
       hitEffectiveAimWorldX: 0.6375,
