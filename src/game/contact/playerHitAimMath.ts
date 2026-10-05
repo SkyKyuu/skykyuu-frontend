@@ -1,4 +1,7 @@
-import { validatePlayerHitAimLateral } from '@/game/contact/playerHitAim'
+import {
+  validatePlayerHitAimLateral,
+  validatePlayerHitAimForward,
+} from '@/game/contact/playerHitAim'
 import { PLAYER_HIT_AIM_PHYSICS_CONFIG } from '@/game/contact/playerHitAimPhysicsConfig'
 import type { TeamSide } from '@/game/team/teamTypes'
 
@@ -6,13 +9,22 @@ export function playerHitAimLateralToWorldX(
   teamSide: TeamSide,
   aimLateral: number,
 ): number {
-  const validAimLateral = validatePlayerHitAimLateral(aimLateral)
+  return playerLocalAimToWorldAxis(teamSide, validatePlayerHitAimLateral(aimLateral))
+}
 
-  if (validAimLateral === 0) {
+export function playerHitAimForwardToWorldZ(
+  teamSide: TeamSide,
+  aimForward: number,
+): number {
+  return playerLocalAimToWorldAxis(teamSide, validatePlayerHitAimForward(aimForward))
+}
+
+function playerLocalAimToWorldAxis(teamSide: TeamSide, validAim: number): number {
+  if (validAim === 0) {
     return 0
   }
 
-  return teamSide === 'A' ? validAimLateral : -validAimLateral
+  return teamSide === 'A' ? validAim : -validAim
 }
 
 export function getPlayerHitAimVelocityX(

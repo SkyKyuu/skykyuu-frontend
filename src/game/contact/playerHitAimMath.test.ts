@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getPlayerHitAimVelocityX,
   playerHitAimLateralToWorldX,
+  playerHitAimForwardToWorldZ,
 } from '@/game/contact/playerHitAimMath'
 
 describe('player hit aim world mapping', () => {
@@ -31,6 +32,21 @@ describe('player hit aim world mapping', () => {
     (aim) => {
       expect(() => playerHitAimLateralToWorldX('A', aim)).toThrow(RangeError)
     },
+  )
+})
+
+describe('player hit forward aim world Z mapping', () => {
+  it.each([
+    ['A', 1, 1], ['B', 1, -1], ['A', -1, -1], ['B', -1, 1],
+    ['A', Math.SQRT1_2, Math.SQRT1_2], ['B', Math.SQRT1_2, -Math.SQRT1_2],
+    ['A', 0, 0], ['B', 0, 0], ['A', -0, 0], ['B', -0, 0],
+  ] as const)('maps Team %s local forward %s to world Z %s', (team, raw, expected) => {
+    expect(playerHitAimForwardToWorldZ(team, raw)).toBe(expected)
+  })
+
+  it.each([-1.01, 1.01, NaN, Infinity, -Infinity])(
+    'rejects invalid local forward %s',
+    (raw) => expect(() => playerHitAimForwardToWorldZ('B', raw)).toThrow(RangeError),
   )
 })
 

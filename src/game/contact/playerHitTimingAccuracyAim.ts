@@ -1,11 +1,32 @@
-import { validatePlayerHitAimLateral } from '@/game/contact/playerHitAim'
+import {
+  validatePlayerHitAimLateral,
+  validatePlayerHitAimForward,
+} from '@/game/contact/playerHitAim'
 
 export function getPlayerHitTimingEffectiveAimLateral(
   hitAimLateral: number,
   hitTimingAccuracyMultiplier: number,
 ): number {
-  const validHitAimLateral = validatePlayerHitAimLateral(hitAimLateral)
+  return applyTimingAccuracy(
+    validatePlayerHitAimLateral(hitAimLateral),
+    hitTimingAccuracyMultiplier,
+  )
+}
 
+export function getPlayerHitTimingEffectiveAimForward(
+  hitAimForward: number,
+  hitTimingAccuracyMultiplier: number,
+): number {
+  return applyTimingAccuracy(
+    validatePlayerHitAimForward(hitAimForward),
+    hitTimingAccuracyMultiplier,
+  )
+}
+
+function applyTimingAccuracy(
+  validHitAim: number,
+  hitTimingAccuracyMultiplier: number,
+): number {
   if (
     !Number.isFinite(hitTimingAccuracyMultiplier) ||
     hitTimingAccuracyMultiplier <= 0 ||
@@ -16,5 +37,5 @@ export function getPlayerHitTimingEffectiveAimLateral(
     )
   }
 
-  return validHitAimLateral * hitTimingAccuracyMultiplier
+  return validHitAim * hitTimingAccuracyMultiplier
 }
