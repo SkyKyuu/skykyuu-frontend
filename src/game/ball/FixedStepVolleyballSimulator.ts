@@ -211,6 +211,7 @@ export class FixedStepVolleyballSimulator {
           hitTimingGrade,
           hitAimLateral,
           hitTimingAccuracyMultiplier,
+          hitAimForward,
         )
         const responseEvent = createPlayerBallContactResponseEvent(
           respondingContact,

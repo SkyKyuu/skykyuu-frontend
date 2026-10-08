@@ -6,6 +6,7 @@ import type { PlayerBallContactEvent } from '@/game/contact/playerBallContact'
 import { PLAYER_CONTACT_RESPONSE_CONFIG } from '@/game/contact/playerBallContactResponseConfig'
 import {
   getPlayerHitAimVelocityX,
+  getPlayerHitAimVelocityZ,
   playerHitAimForwardToWorldZ,
 } from '@/game/contact/playerHitAimMath'
 import type { PlayerHitTimingSample } from '@/game/contact/playerHitTiming'
@@ -31,12 +32,14 @@ export interface PlayerBallContactResponseEvent {
   hitTimingAccuracyMultiplier: number
   /** Player-local lateral aim captured at hit press; not world X. */
   hitAimLateral: number
-  /** Raw player-local forward aim captured at hit press; telemetry only. */
+  /** Raw player-local forward aim captured at hit press. */
   hitAimForward: number
-  /** Accuracy-adjusted player-local forward intention; telemetry only. */
+  /** Accuracy-adjusted player-local forward intention. */
   hitEffectiveAimForward: number
-  /** Effective forward intention converted to world Z; telemetry only. */
+  /** Effective forward intention converted to world Z. */
   hitEffectiveAimWorldZ: number
+  /** Forward aim velocity contribution added to the timing-powered forward base. */
+  hitAimVelocityZ: number
   /** Player-local lateral aim converted to world X. */
   hitAimWorldX: number
   /** Player-local lateral aim after timing accuracy is applied. */
@@ -53,6 +56,7 @@ export function getPlayerContactResponseVelocity(
   hitTimingGrade: PlayerHitTimingGrade,
   hitAimLateral: number,
   hitTimingAccuracyMultiplier: number,
+  hitAimForward = 0,
 ): BallVector3 {
   const forwardMagnitude =
     PLAYER_CONTACT_RESPONSE_CONFIG.forwardVelocity *
@@ -65,11 +69,17 @@ export function getPlayerContactResponseVelocity(
     teamSide,
     hitEffectiveAimLateral,
   )
+  const hitEffectiveAimForward = getPlayerHitTimingEffectiveAimForward(
+    hitAimForward,
+    hitTimingAccuracyMultiplier,
+  )
+  const aimVelocityZ = getPlayerHitAimVelocityZ(teamSide, hitEffectiveAimForward)
+  const baseForwardWorldZ = teamSide === 'A' ? forwardMagnitude : -forwardMagnitude
 
   return {
     x: incomingVelocity.x + aimVelocityX,
     y: PLAYER_CONTACT_RESPONSE_CONFIG.upwardVelocity,
-    z: teamSide === 'A' ? forwardMagnitude : -forwardMagnitude,
+    z: baseForwardWorldZ + aimVelocityZ,
   }
 }
 
@@ -79,6 +89,7 @@ export function applyPlayerContactResponse(
   hitTimingGrade: PlayerHitTimingGrade,
   hitAimLateral: number,
   hitTimingAccuracyMultiplier: number,
+  hitAimForward = 0,
 ): VolleyballState {
   return {
     position: { ...state.position },
@@ -88,6 +99,7 @@ export function applyPlayerContactResponse(
       hitTimingGrade,
       hitAimLateral,
       hitTimingAccuracyMultiplier,
+      hitAimForward,
     ),
   }
 }
@@ -127,6 +139,10 @@ export function createPlayerBallContactResponseEvent(
     hitAimForward,
     hitEffectiveAimForward,
     hitEffectiveAimWorldZ: playerHitAimForwardToWorldZ(
+      playerContact.teamSide,
+      hitEffectiveAimForward,
+    ),
+    hitAimVelocityZ: getPlayerHitAimVelocityZ(
       playerContact.teamSide,
       hitEffectiveAimForward,
     ),

@@ -36,3 +36,13 @@ export function getPlayerHitAimVelocityX(
     PLAYER_HIT_AIM_PHYSICS_CONFIG.maxLateralVelocityContribution
   )
 }
+
+export function getPlayerHitAimVelocityZ(
+  teamSide: TeamSide,
+  effectiveAimForward: number,
+): number {
+  return (
+    playerHitAimForwardToWorldZ(teamSide, effectiveAimForward) *
+    PLAYER_HIT_AIM_PHYSICS_CONFIG.maxForwardVelocityContribution
+  )
+}

@@ -6,10 +6,10 @@ import { VOLLEYBALL_SIMULATION_CONFIG } from '@/game/ball/volleyballSimulationCo
 
 describe('BallDebugOverlay forward telemetry', () => {
   it.each([
-    [Math.SQRT1_2, '+0.707'],
-    [-1, '-1.000'],
-    [0, '0.000'],
-  ] as const)('displays local forward %s with its sign', (aimForward, expected) => {
+    [Math.SQRT1_2, '+0.707', '+1.414', '6.414'],
+    [-1, '-1.000', '-2.000', '3.000'],
+    [0, '0.000', '0.000', '5.000'],
+  ] as const)('displays local forward %s with its sign', (aimForward, expected, contribution, outgoing) => {
     const simulator = new FixedStepVolleyballSimulator({
       position: { x: 0, y: 1, z: 0 }, velocity: { x: 0, y: 0, z: 0 },
     })
@@ -28,15 +28,17 @@ describe('BallDebugOverlay forward telemetry', () => {
     expect(screen.getByText('Hit Aim Forward (local)').nextElementSibling).toHaveTextContent(expected)
     expect(screen.getByText('Effective Aim Forward').nextElementSibling).toHaveTextContent(expected)
     expect(screen.getByText('Effective Aim World Z').nextElementSibling).toHaveTextContent(expected)
+    expect(screen.getByText('Aim Vz Contribution').nextElementSibling).toHaveTextContent(contribution)
+    expect(screen.getByText('Outgoing Vz').nextElementSibling).toHaveTextContent(outgoing)
     expect(screen.queryByText(/Hit Aim World Z/)).not.toBeInTheDocument()
   })
 
   it.each([
-    ['A', 1, '+1.000', '+0.850', '+0.850'],
-    ['B', 1, '+1.000', '+0.850', '-0.850'],
-    ['B', -1, '-1.000', '-0.850', '+0.850'],
-    ['A', Math.SQRT1_2, '+0.707', '+0.601', '+0.601'],
-  ] as const)('displays EARLY Team %s forward %s fidelity', (teamSide, aimForward, raw, effective, worldZ) => {
+    ['A', 1, '+1.000', '+0.850', '+0.850', '+1.700', '6.200'],
+    ['B', 1, '+1.000', '+0.850', '-0.850', '-1.700', '-6.200'],
+    ['B', -1, '-1.000', '-0.850', '+0.850', '+1.700', '-2.800'],
+    ['A', Math.SQRT1_2, '+0.707', '+0.601', '+0.601', '+1.202', '5.702'],
+  ] as const)('displays EARLY Team %s forward %s fidelity', (teamSide, aimForward, raw, effective, worldZ, contribution, outgoing) => {
     const simulator = new FixedStepVolleyballSimulator({
       position: { x: 0, y: 1, z: 0 }, velocity: { x: 0, y: 0, z: 0 },
     })
@@ -57,6 +59,7 @@ describe('BallDebugOverlay forward telemetry', () => {
     expect(screen.getByText('Hit Aim Forward (local)').nextElementSibling).toHaveTextContent(raw)
     expect(screen.getByText('Effective Aim Forward').nextElementSibling).toHaveTextContent(effective)
     expect(screen.getByText('Effective Aim World Z').nextElementSibling).toHaveTextContent(worldZ)
-    expect(screen.queryByText(/Aim Vz Contribution/)).not.toBeInTheDocument()
+    expect(screen.getByText('Aim Vz Contribution').nextElementSibling).toHaveTextContent(contribution)
+    expect(screen.getByText('Outgoing Vz').nextElementSibling).toHaveTextContent(outgoing)
   })
 })
