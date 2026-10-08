@@ -42,7 +42,7 @@ function run(teamSide: TeamSide, offset: number, aimForward: number) {
   return { event, result, responseState, nextState: simulator.getState() }
 }
 
-describe('timing accuracy forward fidelity telemetry', () => {
+describe('timing accuracy forward fidelity and physics', () => {
   const cases = TIMING_CASES.flatMap(([offset, grade, accuracy, power]) =>
     (['A', 'B'] as const).flatMap((team) =>
       [-1, 0, 1, 0.5, -Math.SQRT1_2, Math.SQRT1_2].map((raw) =>
@@ -62,12 +62,25 @@ describe('timing accuracy forward fidelity telemetry', () => {
     expect(event.hitEffectiveAimForward).toBe(raw * accuracy)
     const expectedWorldZ = raw === 0 ? 0 : (team === 'A' ? raw * accuracy : -(raw * accuracy))
     expect(event.hitEffectiveAimWorldZ).toBe(expectedWorldZ)
-    expect({ ...event, hitAimForward: 0, hitEffectiveAimForward: 0, hitEffectiveAimWorldZ: 0 }).toEqual(neutral.event)
-    expect(event.outgoingVelocity).toEqual(neutral.event.outgoingVelocity)
-    expect(event.outgoingVelocity.z).toBe(team === 'A' ? 5.0 * power : -5.0 * power)
-    expect(actual.responseState).toEqual(neutral.responseState)
-    expect(actual.nextState).toEqual(neutral.nextState)
-    expect(event).not.toHaveProperty('hitAimVelocityZ')
+    const baseForwardWorldZ = team === 'A' ? 5.0 * power : -5.0 * power
+    const expectedAimVelocityZ = expectedWorldZ * 2
+    const expectedOutgoingZ = baseForwardWorldZ + expectedAimVelocityZ
+    expect(event.hitAimVelocityZ).toBe(expectedAimVelocityZ)
+    expect(event.outgoingVelocity).toEqual({ ...neutral.event.outgoingVelocity, z: expectedOutgoingZ })
+    expect(event.outgoingVelocity.z).toBe(baseForwardWorldZ + event.hitAimVelocityZ)
+    expect({
+      ...event, hitAimForward: 0, hitEffectiveAimForward: 0, hitEffectiveAimWorldZ: 0,
+      hitAimVelocityZ: 0, outgoingVelocity: neutral.event.outgoingVelocity,
+    }).toEqual(neutral.event)
+    expect(actual.responseState).toEqual({ ...neutral.responseState, velocity: event.outgoingVelocity })
+    expect(actual.nextState).toEqual({
+      position: {
+        ...neutral.nextState.position,
+        z: actual.responseState.position.z + expectedOutgoingZ * STEP,
+      },
+      velocity: { ...neutral.nextState.velocity, z: expectedOutgoingZ },
+    })
+    expect(team === 'A' ? event.outgoingVelocity.z > 0 : event.outgoingVelocity.z < 0).toBe(true)
     expect(actual).toEqual(run(team, offset, raw))
   })
 
@@ -77,6 +90,8 @@ describe('timing accuracy forward fidelity telemetry', () => {
   ] as const)('Team B EARLY raw %s produces effective %s and world Z %s', (raw, effective, worldZ) => {
     expect(run('B', -1, raw).event).toMatchObject({
       hitAimForward: raw, hitEffectiveAimForward: effective, hitEffectiveAimWorldZ: worldZ,
+      hitAimVelocityZ: worldZ * 2,
+      outgoingVelocity: { z: -4.5 + worldZ * 2 },
     })
   })
 })

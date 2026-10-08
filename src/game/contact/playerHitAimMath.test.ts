@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   getPlayerHitAimVelocityX,
+  getPlayerHitAimVelocityZ,
   playerHitAimLateralToWorldX,
   playerHitAimForwardToWorldZ,
 } from '@/game/contact/playerHitAimMath'
@@ -65,5 +66,24 @@ describe('player hit aim velocity contribution', () => {
     (team, aim, velocityX) => {
       expect(getPlayerHitAimVelocityX(team, aim)).toBe(velocityX)
     },
+  )
+})
+
+describe('player hit forward aim velocity contribution', () => {
+  it.each([
+    ['A', -1, -2], ['A', 0, 0], ['A', 1, 2],
+    ['B', -1, 2], ['B', 0, 0], ['B', 1, -2],
+    ['A', -0, 0], ['B', -0, 0],
+    ['A', 0.85, 1.7], ['B', 0.85, -1.7],
+    ['A', 0.5, 1], ['B', 0.5, -1],
+    ['A', Math.SQRT1_2, Math.SQRT1_2 * 2],
+    ['B', Math.SQRT1_2, -Math.SQRT1_2 * 2],
+  ] as const)('Team %s effective forward %s contributes %s m/s', (team, effective, velocityZ) => {
+    expect(getPlayerHitAimVelocityZ(team, effective)).toBe(velocityZ)
+  })
+
+  it.each([-1.01, 1.01, NaN, Infinity, -Infinity])(
+    'rejects invalid effective forward %s',
+    (effective) => expect(() => getPlayerHitAimVelocityZ('B', effective)).toThrow(RangeError),
   )
 })

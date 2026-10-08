@@ -40,7 +40,7 @@ describe('forward hit aim intent buffer', () => {
     [-1, 0, 1, -Math.SQRT1_2, Math.SQRT1_2, 0.5].map((forward) => [team, forward] as const),
   )
 
-  it.each(localCases)('Team %s preserves local forward %s on response without physics', (team, forward) => {
+  it.each(localCases)('Team %s preserves local forward %s and applies only Z physics', (team, forward) => {
     const simulator = new FixedStepVolleyballSimulator(INITIAL)
     const event = response(simulator.advance(STEP, [target('player', team)], [intent(forward)]))
     const neutral = new FixedStepVolleyballSimulator(INITIAL)
@@ -49,12 +49,20 @@ describe('forward hit aim intent buffer', () => {
     expect({
       ...event, hitAimForward: 0,
       hitEffectiveAimForward: 0, hitEffectiveAimWorldZ: 0,
+      hitAimVelocityZ: 0, outgoingVelocity: neutralEvent.outgoingVelocity,
     }).toEqual(neutralEvent)
-    expect(simulator.getState()).toEqual(neutral.getState())
+    const expectedAimVelocityZ = forward === 0 ? 0 : (team === 'A' ? forward * 2 : -forward * 2)
+    expect(event.hitAimVelocityZ).toBe(expectedAimVelocityZ)
+    expect(event.outgoingVelocity).toEqual({
+      ...neutralEvent.outgoingVelocity,
+      z: neutralEvent.outgoingVelocity.z + expectedAimVelocityZ,
+    })
+    expect(simulator.getState()).toEqual({
+      ...neutral.getState(), velocity: event.outgoingVelocity,
+    })
     expect(pendingForward(simulator).size).toBe(0)
     expect(event).not.toHaveProperty('hitAimWorldZ')
     expect(event.hitEffectiveAimForward).toBe(forward)
-    expect(event).not.toHaveProperty('hitAimVelocityZ')
   })
 
   it('latches at press, ignores later movement, and leaves raw forward unscaled by EARLY accuracy', () => {
@@ -66,13 +74,18 @@ describe('forward hit aim intent buffer', () => {
     expect(event.hitAimForward).toBe(1)
     expect(event.hitTimingGrade).toBe('EARLY')
     expect(event.hitTimingAccuracyMultiplier).toBe(0.85)
-    expect(event.outgoingVelocity.z).toBe(-4.5)
+    expect(event.hitEffectiveAimForward).toBe(0.85)
+    expect(event.hitAimVelocityZ).toBe(-1.7)
+    expect(event.outgoingVelocity.z).toBeCloseTo(-6.2, 12)
   })
 
   it('zero-step press preserves the value until the next simulation step', () => {
     const simulator = new FixedStepVolleyballSimulator(INITIAL)
     expect(simulator.advance(0, [], [intent(Math.SQRT1_2)]).executedSteps).toBe(0)
-    expect(response(simulator.advance(STEP, [target()], [intent(-1, 'player', false)])).hitAimForward).toBe(Math.SQRT1_2)
+    const event = response(simulator.advance(STEP, [target()], [intent(-1, 'player', false)]))
+    expect(event.hitAimForward).toBe(Math.SQRT1_2)
+    expect(event.hitAimVelocityZ).toBe(Math.SQRT1_2 * 2)
+    expect(event.outgoingVelocity.z).toBe(5 + Math.SQRT1_2 * 2)
   })
 
   it('a legitimate re-press replaces forward and timing together', () => {
@@ -82,6 +95,8 @@ describe('forward hit aim intent buffer', () => {
     const event = response(simulator.advance(STEP, [target()]))
     expect(event.hitAimForward).toBe(-1)
     expect(event.hitTimingOffsetSteps).toBe(0)
+    expect(event.hitAimVelocityZ).toBe(-2)
+    expect(event.outgoingVelocity.z).toBe(3)
   })
 
   it('expiration removes forward and only a new press can arm it again', () => {
@@ -108,8 +123,18 @@ describe('forward hit aim intent buffer', () => {
     expectNoResponse(simulator.advance(delta, [target()], [intent(-1)]))
     expect(pendingForward(simulator).size).toBe(0)
     simulator.advance(STEP, [target('player', 'A', true)])
-    expectNoResponse(simulator.advance(STEP, [target()]))
-    expect(response(simulator.advance(STEP, [target()], [intent(0.5)])).hitAimForward).toBe(0.5)
+    // Keep reentry overlapping after the faster forward flight, without changing the buffer lifecycle.
+    const reentryTarget = {
+      ...target(), position: { ...simulator.getState().position, y: 0 },
+    }
+    const reentry = simulator.advance(STEP, [reentryTarget])
+    expect(reentry.events.some((event) => event.type === 'PLAYER_CONTACT')).toBe(true)
+    expectNoResponse(reentry)
+    const event = response(simulator.advance(STEP, [reentryTarget], [intent(0.5)]))
+    expect(event.hitAimForward).toBe(0.5)
+    expect(event.hitTimingGrade).toBe('LATE')
+    expect(event.hitAimVelocityZ).toBe(0.85)
+    expect(event.outgoingVelocity.z).toBe(4.5 + 0.85)
   })
 
   it('ground impact clears forward and remains terminal', () => {

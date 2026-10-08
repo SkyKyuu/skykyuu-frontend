@@ -280,6 +280,7 @@ describe('FixedStepVolleyballSimulator hit-gated player contact response', () =>
       hitAimForward: 0,
       hitEffectiveAimForward: 0,
       hitEffectiveAimWorldZ: 0,
+      hitAimVelocityZ: 0,
       type: 'PLAYER_CONTACT_RESPONSE',
       playerId: 'player-b',
       teamSide: 'B',

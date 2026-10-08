@@ -7,4 +7,7 @@ describe('player hit aim physics config', () => {
       PLAYER_HIT_AIM_PHYSICS_CONFIG.maxLateralVelocityContribution,
     ).toBe(3)
   })
+  it('uses the frozen maximum forward contribution of 2 m/s', () => {
+    expect(PLAYER_HIT_AIM_PHYSICS_CONFIG.maxForwardVelocityContribution).toBe(2)
+  })
 })

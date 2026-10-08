@@ -238,7 +238,7 @@ describe('player contact response math', () => {
 
   it('copies the incoming and outgoing values into a response event', () => {
     const contact = structuredClone(CONTACT)
-    const outgoingVelocity = { x: 5.9125, y: 6.3, z: -4.5 }
+    const outgoingVelocity = { x: 5.9125, y: 6.3, z: -5.35 }
     const hitTiming = {
       offsetSteps: -2,
       offsetSeconds:
@@ -270,7 +270,7 @@ describe('player contact response math', () => {
       teamSide: 'B',
       ballPosition: { x: 1, y: 2, z: 3 },
       incomingVelocity: { x: 4, y: -3, z: 5 },
-      outgoingVelocity: { x: 5.9125, y: 6.3, z: -4.5 },
+      outgoingVelocity: { x: 5.9125, y: 6.3, z: -5.35 },
       hitTimingOffsetSteps: -2,
       hitTimingOffsetSeconds:
         -2 * VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds,
@@ -281,6 +281,7 @@ describe('player contact response math', () => {
       hitAimForward: 0.5,
       hitEffectiveAimForward: 0.425,
       hitEffectiveAimWorldZ: -0.425,
+      hitAimVelocityZ: -0.85,
       hitAimWorldX: 0.75,
       hitEffectiveAimLateral: -0.6375,
       hitEffectiveAimWorldX: 0.6375,
