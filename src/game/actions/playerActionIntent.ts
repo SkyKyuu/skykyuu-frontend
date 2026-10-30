@@ -3,7 +3,7 @@ import type { PlayerHitIntent } from '@/game/contact/playerHitIntent'
 
 /** Immutable player-local intention; hit capture and execution remain in the existing hit flow. */
 export interface PlayerActionIntent extends Readonly<PlayerHitIntent> {
-  readonly actionType: PlayerActionType
+  readonly actionType: Extract<PlayerActionType, 'GENERIC_HIT'>
 }
 
 /** Represents an existing hit intent without validating or transforming its captured values. */

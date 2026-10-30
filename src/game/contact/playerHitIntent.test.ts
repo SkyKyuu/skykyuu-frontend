@@ -13,6 +13,7 @@ describe('createPlayerHitIntent', () => {
       localMove: { lateral: Math.SQRT1_2, forward: Math.SQRT1_2 },
       worldMove: { worldX: 0, worldZ: -1 },
       jumpHeld: false, jumpPressed: false, hitHeld: true, hitPressed: true,
+      forearmPassHeld: false, forearmPassPressed: false,
     }
     const intent = createPlayerHitIntent(snapshot)
     snapshot.localMove.forward = -1
@@ -33,6 +34,8 @@ describe('createPlayerHitIntent', () => {
       jumpPressed: false,
       hitHeld: true,
       hitPressed: true,
+      forearmPassHeld: false,
+      forearmPassPressed: false,
     }
 
     expect(createPlayerHitIntent(snapshot)).toEqual<PlayerHitIntent>({

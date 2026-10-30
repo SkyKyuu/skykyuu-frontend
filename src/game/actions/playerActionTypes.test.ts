@@ -4,9 +4,9 @@ import type { PlayerActionIntent } from '@/game/actions/playerActionIntent'
 import type { PlayerHitIntent } from '@/game/contact/playerHitIntent'
 
 describe('player action type contract', () => {
-  it('contains only the approved GENERIC_HIT action', () => {
-    expectTypeOf<PlayerActionType>().toEqualTypeOf<'GENERIC_HIT'>()
-    expectTypeOf<PlayerActionIntent['actionType']>().toEqualTypeOf<PlayerActionType>()
+  it('contains only GENERIC_HIT and FOREARM_PASS while preserving the generic adapter type', () => {
+    expectTypeOf<PlayerActionType>().toEqualTypeOf<'GENERIC_HIT' | 'FOREARM_PASS'>()
+    expectTypeOf<PlayerActionIntent['actionType']>().toEqualTypeOf<'GENERIC_HIT'>()
   })
 
   it('reuses all legacy intent fields as readonly data', () => {

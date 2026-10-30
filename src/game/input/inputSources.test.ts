@@ -235,6 +235,7 @@ describe('GamepadInputSource', () => {
       localMove: { lateral: 0, forward: 0 },
       jumpHeld: false,
       hitHeld: false,
+      forearmPassHeld: false,
     })
   })
 })

@@ -63,6 +63,7 @@ export class KeyboardInputSource {
       localMove: normalizeMove2D({ lateral, forward }),
       jumpHeld: this.pressedCodes.has(keyboardCodes.jump),
       hitHeld: this.pressedCodes.has(keyboardCodes.hit),
+      forearmPassHeld: this.pressedCodes.has(keyboardCodes.forearmPass),
     }
   }
 
