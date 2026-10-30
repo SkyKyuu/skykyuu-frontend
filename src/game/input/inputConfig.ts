@@ -9,9 +9,11 @@ export const LOCAL_INPUT_CONFIG = {
     right: 'KeyD',
     jump: 'Space',
     hit: 'KeyE',
+    forearmPass: 'KeyQ',
   },
   gamepadButtons: {
     jump: 0,
     hit: 1,
+    forearmPass: 4,
   },
 } as const

@@ -19,6 +19,7 @@ function snapshot(teamSide: 'A' | 'B'): LocalPlayerInputSnapshot {
     localMove: { lateral: Math.SQRT1_2, forward: -Math.SQRT1_2 },
     worldMove: { worldX: teamSide === 'A' ? 1 : -1, worldZ: teamSide === 'A' ? -1 : 1 },
     jumpHeld: false, jumpPressed: false, hitHeld: true, hitPressed: true,
+    forearmPassHeld: false, forearmPassPressed: false,
   }
 }
 

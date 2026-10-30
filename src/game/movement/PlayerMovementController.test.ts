@@ -38,6 +38,8 @@ function createSnapshot(
     jumpPressed,
     hitHeld: false,
     hitPressed: false,
+    forearmPassHeld: false,
+    forearmPassPressed: false,
   }
 }
 

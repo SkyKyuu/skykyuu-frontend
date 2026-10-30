@@ -1,1 +1,1 @@
-export type PlayerActionType = 'GENERIC_HIT'
+export type PlayerActionType = 'GENERIC_HIT' | 'FOREARM_PASS'
