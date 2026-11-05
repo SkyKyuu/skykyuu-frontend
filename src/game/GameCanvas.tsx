@@ -1,5 +1,6 @@
 import { Engine } from '@babylonjs/core/Engines/engine'
 import { useEffect, useRef, useState } from 'react'
+import { ActionIntegrationBridge } from '@/game/actions/actionIntegrationBridge'
 import {
   BallDebugOverlay,
   type BallDebugSnapshot,
@@ -55,6 +56,7 @@ function GameCanvas() {
     const ballSimulator = new FixedStepVolleyballSimulator(
       createPreviewVolleyballState(),
     )
+    const actionBridge = new ActionIntegrationBridge()
     const movementTargets: PlayerMovementTarget[] = INDOOR_PLAYER_SPAWNS.map(
       ({ playerId, teamSide }) => {
         const playerRoot = playerRoots.get(playerId)
@@ -77,10 +79,12 @@ function GameCanvas() {
     const renderScene = () => {
       if (resetPreviewOnNextFrame) {
         ballSimulator.reset(createPreviewVolleyballState())
+        actionBridge.reset()
         resetPreviewOnNextFrame = false
       }
 
       const snapshots = inputManager.update()
+      actionBridge.capture(snapshots, ballSimulator.totalSimulationSteps)
       const playerHitIntents: PlayerHitIntent[] = snapshots.map(
         createPlayerHitIntent,
       )
@@ -102,9 +106,11 @@ function GameCanvas() {
         playerContactTargets,
         playerHitIntents,
       )
+      actionBridge.observeSteps(advanceResult.executedSteps)
 
       for (const event of advanceResult.events) {
         if (event.type === 'GROUND_CONTACT') {
+          actionBridge.suspend()
           lastLanding = event
           resetPreviewOnNextFrame = true
         } else if (event.type === 'PLAYER_CONTACT') {
@@ -128,6 +134,7 @@ function GameCanvas() {
         performance.now() - lastDebugUpdate >=
           LOCAL_INPUT_CONFIG.debugUpdateIntervalMs
       ) {
+        const shadowSnapshots = actionBridge.getSnapshots()
         setDebugSnapshots(
           snapshots.flatMap((snapshot) => {
             const playerRoot = playerRoots.get(snapshot.playerId)
@@ -139,6 +146,7 @@ function GameCanvas() {
               ? [
                   {
                     ...snapshot,
+                    shadowAction: shadowSnapshots.find(({ playerId }) => playerId === snapshot.playerId),
                     position: {
                       x: playerRoot.position.x,
                       y: playerRoot.position.y,
