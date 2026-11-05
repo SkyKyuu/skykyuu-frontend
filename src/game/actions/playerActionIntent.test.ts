@@ -20,6 +20,7 @@ function snapshot(teamSide: 'A' | 'B'): LocalPlayerInputSnapshot {
     worldMove: { worldX: teamSide === 'A' ? 1 : -1, worldZ: teamSide === 'A' ? -1 : 1 },
     jumpHeld: false, jumpPressed: false, hitHeld: true, hitPressed: true,
     forearmPassHeld: false, forearmPassPressed: false,
+    setHeld: false, setPressed: false,
   }
 }
 

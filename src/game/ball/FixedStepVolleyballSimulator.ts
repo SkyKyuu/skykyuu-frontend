@@ -1,4 +1,4 @@
-import { PlayerActionResolver, type PendingPlayerAction, type PlayerCommandIntent } from '@/game/actions/playerActionResolver'
+import { isPlayerCommandPressed, PlayerActionResolver, type PendingPlayerAction, type PlayerCommandIntent } from '@/game/actions/playerActionResolver'
 import {
   copyVolleyballState,
   type BallVector3,
@@ -43,6 +43,7 @@ import { classifyPlayerHitTiming, type PlayerHitTimingGrade } from '@/game/conta
 import { getPlayerHitTimingAccuracyMultiplier } from '@/game/contact/playerHitTimingAccuracy'
 import { getPlayerHitTimingEffectiveAimLateral } from '@/game/contact/playerHitTimingAccuracyAim'
 import { getPlayerHitTimingForwardMultiplier } from '@/game/contact/playerHitTimingPower'
+import { createSetContactResponse, type PlayerSetResponseEvent } from '@/game/contact/setContactResponse'
 
 const STEP_COMPARISON_EPSILON = 1e-12
 
@@ -146,7 +147,7 @@ export class FixedStepVolleyballSimulator {
     }
 
     this.useResponseMode('actions')
-    const presses = intents.filter((intent) => intent.actionType === 'GENERIC_HIT' ? intent.hitPressed : intent.forearmPassPressed)
+    const presses = intents.filter(isPlayerCommandPressed)
     // Reject malformed frame input before replacing a capture or moving the ball.
     for (const intent of presses) {
       validatePlayerHitAimLateral(intent.aimLateral)
@@ -258,8 +259,8 @@ export class FixedStepVolleyballSimulator {
           executedAction = Object.freeze({
             action,
             responseStep: simulationStep,
-            timingGrade: responseEvent.type === 'PLAYER_FOREARM_PASS_RESPONSE'
-              ? responseEvent.timingGrade : responseEvent.hitTimingGrade,
+            timingGrade: responseEvent.type === 'PLAYER_CONTACT_RESPONSE'
+              ? responseEvent.hitTimingGrade : responseEvent.timingGrade,
             outgoingVelocity: Object.freeze({ ...responseEvent.outgoingVelocity }),
           })
         } else {
@@ -413,7 +414,7 @@ export class FixedStepVolleyballSimulator {
     target: PlayerBallContactTarget,
     fixedStepSeconds: number,
     action?: PendingPlayerAction,
-  ): PlayerBallContactResponseEvent | PlayerForearmPassResponseEvent {
+  ): PlayerBallContactResponseEvent | PlayerForearmPassResponseEvent | PlayerSetResponseEvent {
     const { playerId } = target
     const pressStep = action?.pressStep ?? this.hitPressStepByPlayer.get(playerId)
     const contactEntryStep = this.contactEntryStepByPlayer.get(playerId)
@@ -427,12 +428,20 @@ export class FixedStepVolleyballSimulator {
     const respondingContact = createPlayerBallContactEvent(this.state, target)
     const hitAimLateral = action?.aimLateral ?? this.getResponseHitAimLateral(playerId)
     const hitAimForward = action?.aimForward ?? this.getResponseHitAimForward(playerId)
-    if (action?.actionType === 'FOREARM_PASS') {
-      const response = createForearmPassContactResponse(
-        respondingContact, pressStep, contactEntryStep, fixedStepSeconds, hitAimLateral, hitAimForward,
-      )
-      this.state = { position: { ...this.state.position }, velocity: { ...response.outgoingVelocity } }
-      return response
+    switch (action?.actionType) {
+      case 'SET':
+      case 'FOREARM_PASS': {
+        const createResponse = action.actionType === 'SET'
+          ? createSetContactResponse : createForearmPassContactResponse
+        const response = createResponse(
+          respondingContact, pressStep, contactEntryStep, fixedStepSeconds, hitAimLateral, hitAimForward,
+        )
+        this.state = { position: { ...this.state.position }, velocity: { ...response.outgoingVelocity } }
+        return response
+      }
+      case 'GENERIC_HIT':
+      case undefined:
+        break
     }
 
     const hitTiming = createPlayerHitTimingSample(pressStep, contactEntryStep, fixedStepSeconds)

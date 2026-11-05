@@ -25,6 +25,7 @@ function createNeutralSourceState(binding: LocalInputBinding): InputSourceState 
     jumpHeld: false,
     hitHeld: false,
     forearmPassHeld: false,
+    setHeld: false,
   }
 }
 
@@ -35,6 +36,7 @@ export class LocalInputManager {
   private readonly previousJumpHeld = new Map<string, boolean>()
   private readonly previousHitHeld = new Map<string, boolean>()
   private readonly previousForearmPassHeld = new Map<string, boolean>()
+  private readonly previousSetHeld = new Map<string, boolean>()
   private snapshots: readonly LocalPlayerInputSnapshot[]
   private started = false
 
@@ -65,12 +67,14 @@ export class LocalInputManager {
       this.previousJumpHeld.set(binding.playerId, false)
       this.previousHitHeld.set(binding.playerId, false)
       this.previousForearmPassHeld.set(binding.playerId, false)
+      this.previousSetHeld.set(binding.playerId, false)
     }
 
     this.snapshots = bindings.map((binding) =>
       this.createSnapshot(
         binding,
         createNeutralSourceState(binding),
+        false,
         false,
         false,
         false,
@@ -110,16 +114,20 @@ export class LocalInputManager {
       const hitPressed = sourceState.hitHeld && !wasHitHeld
       const wasForearmPassHeld = this.previousForearmPassHeld.get(binding.playerId) ?? false
       const forearmPassPressed = sourceState.forearmPassHeld && !wasForearmPassHeld
+      const wasSetHeld = this.previousSetHeld.get(binding.playerId) ?? false
+      const setPressed = sourceState.setHeld && !wasSetHeld
 
       this.previousJumpHeld.set(binding.playerId, sourceState.jumpHeld)
       this.previousHitHeld.set(binding.playerId, sourceState.hitHeld)
       this.previousForearmPassHeld.set(binding.playerId, sourceState.forearmPassHeld)
+      this.previousSetHeld.set(binding.playerId, sourceState.setHeld)
       return this.createSnapshot(
         binding,
         sourceState,
         jumpPressed,
         hitPressed,
         forearmPassPressed,
+        setPressed,
       )
     })
 
@@ -135,6 +143,7 @@ export class LocalInputManager {
     this.previousJumpHeld.clear()
     this.previousHitHeld.clear()
     this.previousForearmPassHeld.clear()
+    this.previousSetHeld.clear()
     this.started = false
   }
 
@@ -144,6 +153,7 @@ export class LocalInputManager {
     jumpPressed: boolean,
     hitPressed: boolean,
     forearmPassPressed: boolean,
+    setPressed: boolean,
   ): LocalPlayerInputSnapshot {
     return {
       playerId: binding.playerId,
@@ -159,6 +169,8 @@ export class LocalInputManager {
       hitPressed,
       forearmPassHeld: sourceState.forearmPassHeld,
       forearmPassPressed,
+      setHeld: sourceState.setHeld,
+      setPressed,
     }
   }
 }

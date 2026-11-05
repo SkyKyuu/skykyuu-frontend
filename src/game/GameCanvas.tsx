@@ -14,6 +14,7 @@ import type {
 } from '@/game/contact/playerBallContact'
 import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallContactResponse'
 import type { PlayerForearmPassResponseEvent } from '@/game/contact/forearmPassContactResponse'
+import type { PlayerSetResponseEvent } from '@/game/contact/setContactResponse'
 import { createGameScene } from '@/game/createGameScene'
 import {
   InputDebugOverlay,
@@ -70,6 +71,7 @@ function GameCanvas() {
     let lastPlayerContact: PlayerBallContactEvent | null = null
     let lastContactResponse: PlayerBallContactResponseEvent | null = null
     let lastForearmPassResponse: PlayerForearmPassResponseEvent | null = null
+    let lastSetResponse: PlayerSetResponseEvent | null = null
     const lastExecutedActions = new Map<string, ExecutedPlayerAction>()
     let resetPreviewOnNextFrame = false
 
@@ -78,6 +80,8 @@ function GameCanvas() {
       if (resetPreviewOnNextFrame) {
         ballSimulator.reset(createPreviewVolleyballState())
         lastExecutedActions.clear()
+        lastSetResponse = null
+        lastDebugUpdate = -Infinity
         resetPreviewOnNextFrame = false
       }
 
@@ -118,6 +122,8 @@ function GameCanvas() {
           lastContactResponse = event
         } else if (event.type === 'PLAYER_FOREARM_PASS_RESPONSE') {
           lastForearmPassResponse = event
+        } else if (event.type === 'PLAYER_SET_RESPONSE') {
+          lastSetResponse = event
         }
       }
 
@@ -171,6 +177,7 @@ function GameCanvas() {
           lastPlayerContact,
           lastContactResponse,
           lastForearmPassResponse,
+          lastSetResponse,
         })
         lastDebugUpdate = performance.now()
       }

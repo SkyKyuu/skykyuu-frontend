@@ -13,9 +13,10 @@ const INITIAL = { position: { x: 0, y: 1, z: 0 }, velocity: { x: 0.25, y: 0, z: 
 const HIT = 'GENERIC_HIT'
 const PASS = 'FOREARM_PASS'
 const target = (playerId = 'a', teamSide: TeamSide = 'A', x = 0, z = 0) => ({ playerId, teamSide, position: { x, y: 0, z } })
-const responseType = (type: ResolvableActionType) => type === PASS ? 'PLAYER_FOREARM_PASS_RESPONSE' : 'PLAYER_CONTACT_RESPONSE'
+type PreviousActionType = Exclude<ResolvableActionType, 'SET'>
+const responseType = (type: PreviousActionType) => type === PASS ? 'PLAYER_FOREARM_PASS_RESPONSE' : 'PLAYER_CONTACT_RESPONSE'
 
-function command(actionType: ResolvableActionType, playerId = 'a', aimLateral = 0, aimForward = 0): PlayerCommandIntent {
+function command(actionType: PreviousActionType, playerId = 'a', aimLateral = 0, aimForward = 0): PlayerCommandIntent {
   return actionType === HIT
     ? { actionType, playerId, aimLateral, aimForward, hitHeld: true, hitPressed: true }
     : { actionType, playerId, aimLateral, aimForward, forearmPassHeld: true, forearmPassPressed: true }
@@ -54,6 +55,7 @@ describe('action capture and authoritative contact selection', () => {
       playerId: 'a', teamSide: 'A', deviceKind: 'keyboard', deviceName: 'Keyboard', deviceConnected: true,
       jumpHeld: false, jumpPressed: false, localMove: { lateral: -0.25, forward: 0.5 }, worldMove: { worldX: -1, worldZ: -1 },
       hitPressed: true, hitHeld: true, forearmPassPressed: true, forearmPassHeld: true,
+      setHeld: false, setPressed: false,
     }
     const intents = createFrameActionIntents([input, { ...input, playerId: 'b', teamSide: 'B', forearmPassPressed: false }])
     expect(intents.map(({ playerId, actionType }) => [playerId, actionType])).toEqual([['a', HIT], ['a', PASS], ['b', HIT]])

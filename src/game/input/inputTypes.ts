@@ -32,6 +32,7 @@ export interface InputSourceState {
   jumpHeld: boolean
   hitHeld: boolean
   forearmPassHeld: boolean
+  setHeld: boolean
 }
 
 export interface LocalPlayerInputSnapshot {
@@ -48,4 +49,6 @@ export interface LocalPlayerInputSnapshot {
   hitPressed: boolean
   forearmPassHeld: boolean
   forearmPassPressed: boolean
+  setHeld: boolean
+  setPressed: boolean
 }

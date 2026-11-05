@@ -7,13 +7,15 @@ import type { LocalPlayerInputSnapshot } from '@/game/input/inputTypes'
 import { FixedStepVolleyballSimulator } from '@/game/ball/FixedStepVolleyballSimulator'
 import { VOLLEYBALL_SIMULATION_CONFIG } from '@/game/ball/volleyballSimulationConfig'
 
-function intent(type: ResolvableActionType, playerId = 'player', lateral = 0.375, forward = -0.25): PlayerActionIntent | ForearmPassIntent {
+type PreviousActionType = Exclude<ResolvableActionType, 'SET'>
+
+function intent(type: PreviousActionType, playerId = 'player', lateral = 0.375, forward = -0.25): PlayerActionIntent | ForearmPassIntent {
   return type === 'GENERIC_HIT'
     ? { actionType: type, playerId, hitHeld: true, hitPressed: true, aimLateral: lateral, aimForward: forward }
     : { actionType: type, playerId, forearmPassHeld: true, forearmPassPressed: true, aimLateral: lateral, aimForward: forward }
 }
 
-function capture(resolver: PlayerActionResolver, type: ResolvableActionType, step: number, playerId = 'player', lateral = 0.375, forward = -0.25): PendingPlayerAction {
+function capture(resolver: PlayerActionResolver, type: PreviousActionType, step: number, playerId = 'player', lateral = 0.375, forward = -0.25): PendingPlayerAction {
   const action = resolver.capture(intent(type, playerId, lateral, forward), step)
   if (!action) throw new Error('Missing capture')
   return action
@@ -23,7 +25,7 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('isolated player action capture and priority', () => {
   it('exposes only the approved immutable pending data', () => {
-    expectTypeOf<ResolvableActionType>().toEqualTypeOf<'GENERIC_HIT' | 'FOREARM_PASS'>()
+    expectTypeOf<ResolvableActionType>().toEqualTypeOf<'GENERIC_HIT' | 'FOREARM_PASS' | 'SET'>()
     expectTypeOf<PendingPlayerAction>().toEqualTypeOf<Readonly<PendingPlayerAction>>()
     expect(capture(new PlayerActionResolver(), 'GENERIC_HIT', 0)).toEqual({
       playerId: 'player', actionType: 'GENERIC_HIT', pressStep: 0, aimLateral: 0.375, aimForward: -0.25,
@@ -311,6 +313,7 @@ describe('immutable local data and deterministic step clock', () => {
       localMove: { lateral: Math.SQRT1_2, forward: -Math.SQRT1_2 }, worldMove: { worldX: -1, worldZ: 1 },
       jumpHeld: false, jumpPressed: false, hitHeld: true, hitPressed: true,
       forearmPassHeld: true, forearmPassPressed: true,
+      setHeld: false, setPressed: false,
     }
     const original = structuredClone(snapshot)
     const legacy = createPlayerHitIntent(snapshot)
@@ -338,5 +341,95 @@ describe('immutable local data and deterministic step clock', () => {
     expect(hit.events.find((event) => event.type === 'PLAYER_CONTACT_RESPONSE')).toMatchObject({
       outgoingVelocity: { x: 0.25 - Math.SQRT1_2 * 3, y: 6.3, z: -5 + Math.SQRT1_2 * 2 },
     })
+  })
+})
+
+describe('three-action arbitration with SET', () => {
+  function captureSet(resolver: PlayerActionResolver, step: number, playerId = 'player', aimLateral = 0.5, aimForward = -0.125) {
+    return resolver.capture({ actionType: 'SET', playerId, aimLateral, aimForward, setHeld: true, setPressed: true }, step)!
+  }
+
+  it.each([
+    [['GENERIC_HIT', 'FOREARM_PASS'], 'FOREARM_PASS'],
+    [['FOREARM_PASS', 'GENERIC_HIT'], 'FOREARM_PASS'],
+    [['GENERIC_HIT', 'SET'], 'SET'],
+    [['SET', 'GENERIC_HIT'], 'SET'],
+    [['FOREARM_PASS', 'SET'], 'SET'],
+    [['SET', 'FOREARM_PASS'], 'SET'],
+    [['GENERIC_HIT', 'FOREARM_PASS', 'SET'], 'SET'],
+    [['GENERIC_HIT', 'SET', 'FOREARM_PASS'], 'SET'],
+    [['FOREARM_PASS', 'GENERIC_HIT', 'SET'], 'SET'],
+    [['FOREARM_PASS', 'SET', 'GENERIC_HIT'], 'SET'],
+    [['SET', 'GENERIC_HIT', 'FOREARM_PASS'], 'SET'],
+    [['SET', 'FOREARM_PASS', 'GENERIC_HIT'], 'SET'],
+  ] as const)('resolves %j to %s on the same step', (order, winner) => {
+    const resolver = new PlayerActionResolver()
+    const candidates = order.map((type) => type === 'SET' ? captureSet(resolver, 0) : capture(resolver, type, 0))
+    expect(resolver.select('player', 0)).toBe(candidates.find(({ actionType }) => actionType === winner))
+  })
+
+  it.each(['GENERIC_HIT', 'FOREARM_PASS', 'SET'] as const)('keeps the earliest %s ahead of both later actions', (first) => {
+    const resolver = new PlayerActionResolver()
+    const earliest = first === 'SET' ? captureSet(resolver, 10) : capture(resolver, first, 10)
+    for (const type of ['GENERIC_HIT', 'FOREARM_PASS', 'SET'] as const) {
+      if (type === first) continue
+      if (type === 'SET') captureSet(resolver, 12)
+      else capture(resolver, type, 12)
+    }
+    expect(resolver.select('player', 15)).toBe(earliest)
+  })
+
+  it('promotes E to Q to R, preserves capture identity and expires all three at age six', () => {
+    const resolver = new PlayerActionResolver()
+    const hit = capture(resolver, 'GENERIC_HIT', 0)
+    expect(resolver.select('player', 0)).toBe(hit)
+    expect(resolver.select('player', 1)).toBe(hit)
+    const pass = capture(resolver, 'FOREARM_PASS', 2)
+    const set = captureSet(resolver, 4)
+    expect(resolver.select('player', 5)).toBe(hit)
+    expect(resolver.select('player', 6)).toBe(pass)
+    expect(resolver.select('player', 7)).toBe(pass)
+    expect(resolver.select('player', 8)).toBe(set)
+    expect(resolver.select('player', 9)).toBe(set)
+    expect(set).toMatchObject({ pressStep: 4, aimLateral: 0.5, aimForward: -0.125 })
+    expect(resolver.select('player', 10)).toBeNull()
+    expect(resolver.select('player', 11)).toBeNull()
+  })
+
+  it.each(['GENERIC_HIT', 'FOREARM_PASS', 'SET'] as const)('replaces only %s on re-press and consumes each original winner in turn', (repressed) => {
+    const resolver = new PlayerActionResolver()
+    const original = [
+      capture(resolver, 'GENERIC_HIT', 0),
+      capture(resolver, 'FOREARM_PASS', 1),
+      captureSet(resolver, 2),
+    ]
+    const replacement = repressed === 'SET'
+      ? captureSet(resolver, 3, 'player', 0.75, 0.5)
+      : capture(resolver, repressed, 3, 'player', 0.75, 0.5)
+    const stale = original.find(({ actionType }) => actionType === repressed)!
+    expect(resolver.cancel(stale, 3)).toBe(false)
+    expect(resolver.consume(stale, 3)).toBe(false)
+    for (const remaining of original.filter((action) => action !== stale).concat(replacement)) {
+      expect(resolver.select('player', 3)).toBe(remaining)
+      expect(resolver.consume(remaining, 3)).toBe(true)
+    }
+    expect(resolver.select('player', 3)).toBeNull()
+  })
+
+  it('isolates players, ignores held SET and invalidates equivalent references after reset', () => {
+    const resolver = new PlayerActionResolver()
+    const old = captureSet(resolver, 0, 'z')
+    const a = capture(resolver, 'GENERIC_HIT', 0, 'a')
+    const held = { actionType: 'SET', playerId: 'z', aimLateral: 0, aimForward: 0, setHeld: true, setPressed: false } as const
+    expect(resolver.capture(held, 5)).toBeNull()
+    expect(resolver.selectAll(5)).toEqual([a, old])
+    expect(resolver.consume(old, 5)).toBe(true)
+    expect(resolver.selectAll(5)).toEqual([a])
+    resolver.reset()
+    const replacement = captureSet(resolver, 0, 'z')
+    expect(replacement).toEqual(old)
+    expect(resolver.cancel(old, 0)).toBe(false)
+    expect(resolver.consume(old, 0)).toBe(false)
+    expect(resolver.selectAll(0)).toEqual([replacement])
   })
 })

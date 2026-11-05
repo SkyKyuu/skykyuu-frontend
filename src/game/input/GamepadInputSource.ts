@@ -12,6 +12,7 @@ const NEUTRAL_GAMEPAD_STATE: InputSourceState = {
   jumpHeld: false,
   hitHeld: false,
   forearmPassHeld: false,
+  setHeld: false,
 }
 
 const BUTTON_PRESS_THRESHOLD = 0.5
@@ -69,6 +70,7 @@ export class GamepadInputSource {
     const jumpButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.jump]
     const hitButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.hit]
     const forearmPassButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.forearmPass]
+    const setButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.set]
 
     return {
       connected: true,
@@ -87,6 +89,9 @@ export class GamepadInputSource {
       forearmPassHeld: Boolean(
         forearmPassButton?.pressed ||
           (forearmPassButton?.value ?? 0) > BUTTON_PRESS_THRESHOLD,
+      ),
+      setHeld: Boolean(
+        setButton?.pressed || (setButton?.value ?? 0) > BUTTON_PRESS_THRESHOLD,
       ),
     }
   }
