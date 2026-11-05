@@ -1,6 +1,6 @@
 import { createForearmPassIntent } from '@/game/actions/forearmPassIntent'
 import { createPlayerActionIntent } from '@/game/actions/playerActionIntent'
-import { PlayerActionResolver, type ResolvableActionType } from '@/game/actions/playerActionResolver'
+import { PlayerActionResolver, type PlayerCommandIntent, type ResolvableActionType } from '@/game/actions/playerActionResolver'
 import { createPlayerHitIntent } from '@/game/contact/playerHitIntent'
 import type { LocalPlayerInputSnapshot } from '@/game/input/inputTypes'
 
@@ -9,6 +9,16 @@ export interface ShadowActionSnapshot {
   readonly simulationStep: number
   readonly selectedActionType: ResolvableActionType | null
   readonly pressStep: number | null
+}
+
+/** Translate a single frame sample into independent action edges, without buffering them. */
+export function createFrameActionIntents(snapshots: readonly LocalPlayerInputSnapshot[]): readonly PlayerCommandIntent[] {
+  const intents: PlayerCommandIntent[] = []
+  for (const snapshot of snapshots) {
+    if (snapshot.hitPressed) intents.push(createPlayerActionIntent(createPlayerHitIntent(snapshot)))
+    if (snapshot.forearmPassPressed) intents.push(createForearmPassIntent(snapshot))
+  }
+  return intents
 }
 
 /** Observes temporal priority independently of the legacy hit buffer and contacts. */
@@ -28,14 +38,7 @@ export class ActionIntegrationBridge {
     this.#playerIds = [...new Set(snapshots.map(({ playerId }) => playerId))].sort()
     if (this.#suspended) return
 
-    for (const snapshot of snapshots) {
-      if (snapshot.hitPressed) {
-        this.#resolver.capture(createPlayerActionIntent(createPlayerHitIntent(snapshot)), simulationStep)
-      }
-      if (snapshot.forearmPassPressed) {
-        this.#resolver.capture(createForearmPassIntent(snapshot), simulationStep)
-      }
-    }
+    for (const intent of createFrameActionIntents(snapshots)) this.#resolver.capture(intent, simulationStep)
   }
 
   /** Returns observations in executed step order. A zero-step frame only refreshes diagnostics. */

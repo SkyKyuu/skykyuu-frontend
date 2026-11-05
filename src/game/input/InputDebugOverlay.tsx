@@ -1,12 +1,15 @@
 import type { LocalPlayerInputSnapshot } from '@/game/input/inputTypes'
-import type { ShadowActionSnapshot } from '@/game/actions/actionIntegrationBridge'
+import type { PendingPlayerAction } from '@/game/actions/playerActionResolver'
+import type { ExecutedPlayerAction } from '@/game/ball/FixedStepVolleyballSimulator'
 
 interface InputDebugOverlayProps {
   snapshots: readonly PlayerDebugSnapshot[]
 }
 
 export interface PlayerDebugSnapshot extends LocalPlayerInputSnapshot {
-  shadowAction?: ShadowActionSnapshot
+  simulationStep: number
+  selectedAction: PendingPlayerAction | null
+  lastExecutedAction: ExecutedPlayerAction | null
   position: {
     x: number
     y: number
@@ -36,7 +39,7 @@ export function InputDebugOverlay({ snapshots }: InputDebugOverlayProps) {
   return (
     <aside
       aria-label="Local input debug"
-      className="pointer-events-none absolute left-3 top-3 z-10 flex max-h-[calc(100vh-1.5rem)] w-64 flex-col gap-2 overflow-hidden rounded-lg border border-slate-600/70 bg-slate-950/85 p-3 font-mono text-xs text-slate-100 shadow-xl backdrop-blur-sm"
+      className="absolute left-3 top-3 z-10 flex max-h-[calc(100vh-1.5rem)] w-64 flex-col gap-2 overflow-y-auto rounded-lg border border-slate-600/70 bg-slate-950/85 p-3 font-mono text-xs text-slate-100 shadow-xl backdrop-blur-sm"
     >
       <div className="text-sm font-semibold tracking-wide text-cyan-300">
         Local Input
@@ -51,6 +54,10 @@ export function InputDebugOverlay({ snapshots }: InputDebugOverlayProps) {
             P{index + 1} · TEAM_{snapshot.teamSide}
           </div>
           <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5">
+            <dt>Player ID</dt>
+            <dd>{snapshot.playerId}</dd>
+            <dt>Simulation Step</dt>
+            <dd>{snapshot.simulationStep}</dd>
             <dt>Device</dt>
             <dd>{formatDevice(snapshot)}</dd>
             <dt>Local X</dt>
@@ -81,10 +88,20 @@ export function InputDebugOverlay({ snapshots }: InputDebugOverlayProps) {
             <dd>{snapshot.forearmPassHeld ? 'true' : 'false'}</dd>
             <dt>Forearm Pass Pressed</dt>
             <dd>{snapshot.forearmPassPressed ? 'true' : 'false'}</dd>
-            <dt title="Temporal selection only; does not execute a contact">Shadow Selected Action</dt>
-            <dd>{snapshot.shadowAction?.selectedActionType ?? '—'}</dd>
-            <dt>Shadow Press Step</dt>
-            <dd>{snapshot.shadowAction?.pressStep ?? '—'}</dd>
+            <dt title="Selection at this step before any response">Selected Action</dt>
+            <dd>{snapshot.selectedAction?.actionType ?? '—'}</dd>
+            <dt>Selected Press Step</dt>
+            <dd>{snapshot.selectedAction?.pressStep ?? '—'}</dd>
+            <dt>Last Executed Action</dt>
+            <dd>{snapshot.lastExecutedAction?.action.actionType ?? '—'}</dd>
+            <dt>Last Action Response Step</dt>
+            <dd>{snapshot.lastExecutedAction?.responseStep ?? '—'}</dd>
+            <dt>Last Timing Grade</dt>
+            <dd>{snapshot.lastExecutedAction?.timingGrade ?? '—'}</dd>
+            <dt>Last Response Velocity</dt>
+            <dd>{snapshot.lastExecutedAction
+              ? [snapshot.lastExecutedAction.outgoingVelocity.x, snapshot.lastExecutedAction.outgoingVelocity.y, snapshot.lastExecutedAction.outgoingVelocity.z].map(formatValue).join(', ')
+              : '—'}</dd>
           </dl>
         </section>
       ))}
