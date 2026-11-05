@@ -1,10 +1,12 @@
 import type { LocalPlayerInputSnapshot } from '@/game/input/inputTypes'
+import type { ShadowActionSnapshot } from '@/game/actions/actionIntegrationBridge'
 
 interface InputDebugOverlayProps {
   snapshots: readonly PlayerDebugSnapshot[]
 }
 
 export interface PlayerDebugSnapshot extends LocalPlayerInputSnapshot {
+  shadowAction?: ShadowActionSnapshot
   position: {
     x: number
     y: number
@@ -75,6 +77,14 @@ export function InputDebugOverlay({ snapshots }: InputDebugOverlayProps) {
             <dd>{snapshot.hitHeld ? 'true' : 'false'}</dd>
             <dt>Hit Pressed</dt>
             <dd>{snapshot.hitPressed ? 'true' : 'false'}</dd>
+            <dt>Forearm Pass Held</dt>
+            <dd>{snapshot.forearmPassHeld ? 'true' : 'false'}</dd>
+            <dt>Forearm Pass Pressed</dt>
+            <dd>{snapshot.forearmPassPressed ? 'true' : 'false'}</dd>
+            <dt title="Temporal selection only; does not execute a contact">Shadow Selected Action</dt>
+            <dd>{snapshot.shadowAction?.selectedActionType ?? '—'}</dd>
+            <dt>Shadow Press Step</dt>
+            <dd>{snapshot.shadowAction?.pressStep ?? '—'}</dd>
           </dl>
         </section>
       ))}
