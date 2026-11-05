@@ -1,5 +1,7 @@
+import { PlayerActionResolver, type PendingPlayerAction, type PlayerCommandIntent } from '@/game/actions/playerActionResolver'
 import {
   copyVolleyballState,
+  type BallVector3,
   type VolleyballState,
 } from '@/game/ball/volleyballState'
 import {
@@ -21,7 +23,9 @@ import {
 import {
   applyPlayerContactResponse,
   createPlayerBallContactResponseEvent,
+  type PlayerBallContactResponseEvent,
 } from '@/game/contact/playerBallContactResponse'
+import { createForearmPassContactResponse, type PlayerForearmPassResponseEvent } from '@/game/contact/forearmPassContactResponse'
 import { PLAYER_HIT_BUFFER_CONFIG } from '@/game/contact/playerHitBufferConfig'
 import {
   validatePlayerHitAimLateral,
@@ -34,9 +38,8 @@ import {
 import type { PlayerHitIntent } from '@/game/contact/playerHitIntent'
 import {
   createPlayerHitTimingSample,
-  type PlayerHitTimingSample,
 } from '@/game/contact/playerHitTiming'
-import { classifyPlayerHitTiming } from '@/game/contact/playerHitTimingGrade'
+import { classifyPlayerHitTiming, type PlayerHitTimingGrade } from '@/game/contact/playerHitTimingGrade'
 import { getPlayerHitTimingAccuracyMultiplier } from '@/game/contact/playerHitTimingAccuracy'
 import { getPlayerHitTimingEffectiveAimLateral } from '@/game/contact/playerHitTimingAccuracyAim'
 import { getPlayerHitTimingForwardMultiplier } from '@/game/contact/playerHitTimingPower'
@@ -46,6 +49,25 @@ const STEP_COMPARISON_EPSILON = 1e-12
 export interface BallSimulationAdvanceResult {
   executedSteps: number
   events: readonly BallSimulationEvent[]
+}
+
+export interface ExecutedPlayerAction {
+  readonly action: PendingPlayerAction
+  readonly responseStep: number
+  readonly timingGrade: PlayerHitTimingGrade
+  readonly outgoingVelocity: Readonly<BallVector3>
+}
+
+export interface ActionStepObservation {
+  readonly simulationStep: number
+  /** Selections before response, including commands that did not get a contact. */
+  readonly selectedActions: readonly PendingPlayerAction[]
+  readonly executedAction: ExecutedPlayerAction | null
+}
+
+export interface ActionSimulationAdvanceResult extends BallSimulationAdvanceResult {
+  readonly actionSteps: readonly ActionStepObservation[]
+  readonly lastActionStep: ActionStepObservation
 }
 
 interface PlayerContactDetectionResult {
@@ -76,6 +98,8 @@ export class FixedStepVolleyballSimulator {
   private hitAimLateralByPlayer = new Map<string, number>()
   private hitAimForwardByPlayer = new Map<string, number>()
   private contactEntryStepByPlayer = new Map<string, number>()
+  private readonly actionResolver = new PlayerActionResolver()
+  private responseMode: 'legacy' | 'actions' | null = null
 
   constructor(initialState: VolleyballState) {
     this.state = copyVolleyballState(initialState)
@@ -102,7 +126,64 @@ export class FixedStepVolleyballSimulator {
       return { executedSteps: 0, events: [] }
     }
 
+    this.useResponseMode('legacy')
     this.armPlayerHitBuffers(playerHitIntents)
+    return this.runFixedSteps(frameDeltaSeconds, playerContactTargets)
+  }
+
+  /** Captures frame edges at totalSimulationSteps and resolves them in the fixed-step loop. */
+  advanceWithActions(
+    frameDeltaSeconds: number,
+    playerContactTargets: readonly PlayerBallContactTarget[] = [],
+    intents: readonly PlayerCommandIntent[] = [],
+  ): ActionSimulationAdvanceResult {
+    const actionSteps: ActionStepObservation[] = []
+    if (this.groundContactOccurred) {
+      return {
+        executedSteps: 0, events: [], actionSteps,
+        lastActionStep: { simulationStep: this.totalSimulationSteps, selectedActions: [], executedAction: null },
+      }
+    }
+
+    this.useResponseMode('actions')
+    const presses = intents.filter((intent) => intent.actionType === 'GENERIC_HIT' ? intent.hitPressed : intent.forearmPassPressed)
+    // Reject malformed frame input before replacing a capture or moving the ball.
+    for (const intent of presses) {
+      validatePlayerHitAimLateral(intent.aimLateral)
+      validatePlayerHitAimForward(intent.aimForward)
+    }
+    for (const intent of presses) {
+      // A fresh press during a responded overlap cannot re-arm that contact.
+      // Candidates captured before the response can survive until exit or expiry.
+      if (!this.respondedPlayerContactIds.has(intent.playerId)) {
+        this.actionResolver.capture(intent, this.totalSimulationSteps)
+      }
+    }
+
+    const result = this.runFixedSteps(frameDeltaSeconds, playerContactTargets, actionSteps)
+    return {
+      ...result,
+      actionSteps,
+      lastActionStep: actionSteps.at(-1) ?? {
+        simulationStep: this.totalSimulationSteps,
+        selectedActions: this.actionResolver.selectAll(this.totalSimulationSteps),
+        executedAction: null,
+      },
+    }
+  }
+
+  private useResponseMode(mode: 'legacy' | 'actions'): void {
+    if (this.responseMode !== null && this.responseMode !== mode) {
+      throw new Error('Reset the volleyball simulator before changing its response mode')
+    }
+    this.responseMode = mode
+  }
+
+  private runFixedSteps(
+    frameDeltaSeconds: number,
+    playerContactTargets: readonly PlayerBallContactTarget[],
+    actionSteps?: ActionStepObservation[],
+  ): BallSimulationAdvanceResult {
 
     const safeFrameDeltaSeconds = getSafeFrameDeltaSeconds(frameDeltaSeconds)
 
@@ -142,6 +223,8 @@ export class FixedStepVolleyballSimulator {
           ),
         )
         this.clearPendingPlayerHits()
+        this.actionResolver.reset()
+        actionSteps?.push({ simulationStep: this.totalSimulationSteps, selectedActions: [], executedAction: null })
         this.groundContactOccurred = true
         this.accumulatedSeconds = 0
         executedSteps += 1
@@ -154,90 +237,46 @@ export class FixedStepVolleyballSimulator {
         this.detectPlayerContacts(this.state, playerContactTargets)
       events.push(...newContactEvents)
 
-      this.discardBuffersForRespondedOverlaps(overlappingTargets)
+      if (!actionSteps) this.discardBuffersForRespondedOverlaps(overlappingTargets)
+      const simulationStep = this.totalSimulationSteps
+      const selectedActions = actionSteps ? this.actionResolver.selectAll(simulationStep) : []
+      const respondingTarget = overlappingTargets.find(({ playerId }) => (
+        !this.respondedPlayerContactIds.has(playerId) && (actionSteps
+          ? selectedActions.some((action) => action.playerId === playerId)
+          : (this.hitBufferRemainingSecondsByPlayer.get(playerId) ?? 0) > 0)
+      ))
 
-      const respondingTarget = overlappingTargets.find((target) => {
-        const remainingBufferSeconds =
-          this.hitBufferRemainingSecondsByPlayer.get(target.playerId) ?? 0
-
-        return (
-          remainingBufferSeconds > 0 &&
-          !this.respondedPlayerContactIds.has(target.playerId)
-        )
-      })
-
+      let executedAction: ExecutedPlayerAction | null = null
       if (respondingTarget) {
-        const hitTiming = this.createResponseHitTiming(
-          respondingTarget.playerId,
-          fixedStepSeconds,
-        )
-        const hitTimingGrade = classifyPlayerHitTiming(
-          hitTiming.offsetSteps,
-        )
-        const hitTimingForwardMultiplier =
-          getPlayerHitTimingForwardMultiplier(hitTimingGrade)
-        const hitTimingAccuracyMultiplier =
-          getPlayerHitTimingAccuracyMultiplier(hitTimingGrade)
-        const hitAimLateral = this.getResponseHitAimLateral(
-          respondingTarget.playerId,
-        )
-        const hitAimForward = this.getResponseHitAimForward(
-          respondingTarget.playerId,
-        )
-        const respondingContact = createPlayerBallContactEvent(
-          this.state,
-          respondingTarget,
-        )
-        const hitAimWorldX = playerHitAimLateralToWorldX(
-          respondingContact.teamSide,
-          hitAimLateral,
-        )
-        const hitEffectiveAimLateral =
-          getPlayerHitTimingEffectiveAimLateral(
-            hitAimLateral,
-            hitTimingAccuracyMultiplier,
-          )
-        const hitEffectiveAimWorldX = playerHitAimLateralToWorldX(
-          respondingContact.teamSide,
-          hitEffectiveAimLateral,
-        )
-        const hitAimVelocityX = getPlayerHitAimVelocityX(
-          respondingContact.teamSide,
-          hitEffectiveAimLateral,
-        )
-        this.state = applyPlayerContactResponse(
-          this.state,
-          respondingContact,
-          hitTimingGrade,
-          hitAimLateral,
-          hitTimingAccuracyMultiplier,
-          hitAimForward,
-        )
-        const responseEvent = createPlayerBallContactResponseEvent(
-          respondingContact,
-          this.state.velocity,
-          hitTiming,
-          hitTimingGrade,
-          hitTimingForwardMultiplier,
-          hitTimingAccuracyMultiplier,
-          hitAimLateral,
-          hitAimWorldX,
-          hitEffectiveAimLateral,
-          hitEffectiveAimWorldX,
-          hitAimVelocityX,
-          hitAimForward,
-        )
-        this.respondedPlayerContactIds.add(respondingTarget.playerId)
-        this.hitBufferRemainingSecondsByPlayer.delete(
-          respondingTarget.playerId,
-        )
-        this.hitPressStepByPlayer.delete(respondingTarget.playerId)
-        this.hitAimLateralByPlayer.delete(respondingTarget.playerId)
-        this.hitAimForwardByPlayer.delete(respondingTarget.playerId)
+        const playerId = respondingTarget.playerId
+        const action = selectedActions.find((candidate) => candidate.playerId === playerId)
+        const responseEvent = this.applyResponse(respondingTarget, fixedStepSeconds, action)
+        if (action) {
+          if (!this.actionResolver.consume(action, simulationStep)) {
+            throw new Error(`Selected action could not be consumed: ${playerId}`)
+          }
+          executedAction = Object.freeze({
+            action,
+            responseStep: simulationStep,
+            timingGrade: responseEvent.type === 'PLAYER_FOREARM_PASS_RESPONSE'
+              ? responseEvent.timingGrade : responseEvent.hitTimingGrade,
+            outgoingVelocity: Object.freeze({ ...responseEvent.outgoingVelocity }),
+          })
+        } else {
+          this.hitBufferRemainingSecondsByPlayer.delete(playerId)
+          this.hitPressStepByPlayer.delete(playerId)
+          this.hitAimLateralByPlayer.delete(playerId)
+          this.hitAimForwardByPlayer.delete(playerId)
+        }
+        this.respondedPlayerContactIds.add(playerId)
         events.push(responseEvent)
       }
 
-      this.decayPlayerHitBuffers(fixedStepSeconds)
+      if (actionSteps) {
+        actionSteps.push({ simulationStep, selectedActions, executedAction })
+      } else {
+        this.decayPlayerHitBuffers(fixedStepSeconds)
+      }
 
       this.accumulatedSeconds -= fixedStepSeconds
       executedSteps += 1
@@ -370,11 +409,13 @@ export class FixedStepVolleyballSimulator {
     return { overlappingTargets, newContactEvents: events }
   }
 
-  private createResponseHitTiming(
-    playerId: string,
+  private applyResponse(
+    target: PlayerBallContactTarget,
     fixedStepSeconds: number,
-  ): PlayerHitTimingSample {
-    const pressStep = this.hitPressStepByPlayer.get(playerId)
+    action?: PendingPlayerAction,
+  ): PlayerBallContactResponseEvent | PlayerForearmPassResponseEvent {
+    const { playerId } = target
+    const pressStep = action?.pressStep ?? this.hitPressStepByPlayer.get(playerId)
     const contactEntryStep = this.contactEntryStepByPlayer.get(playerId)
 
     if (pressStep === undefined || contactEntryStep === undefined) {
@@ -383,10 +424,32 @@ export class FixedStepVolleyballSimulator {
       )
     }
 
-    return createPlayerHitTimingSample(
-      pressStep,
-      contactEntryStep,
-      fixedStepSeconds,
+    const respondingContact = createPlayerBallContactEvent(this.state, target)
+    const hitAimLateral = action?.aimLateral ?? this.getResponseHitAimLateral(playerId)
+    const hitAimForward = action?.aimForward ?? this.getResponseHitAimForward(playerId)
+    if (action?.actionType === 'FOREARM_PASS') {
+      const response = createForearmPassContactResponse(
+        respondingContact, pressStep, contactEntryStep, fixedStepSeconds, hitAimLateral, hitAimForward,
+      )
+      this.state = { position: { ...this.state.position }, velocity: { ...response.outgoingVelocity } }
+      return response
+    }
+
+    const hitTiming = createPlayerHitTimingSample(pressStep, contactEntryStep, fixedStepSeconds)
+    const hitTimingGrade = classifyPlayerHitTiming(hitTiming.offsetSteps)
+    const hitTimingForwardMultiplier = getPlayerHitTimingForwardMultiplier(hitTimingGrade)
+    const hitTimingAccuracyMultiplier = getPlayerHitTimingAccuracyMultiplier(hitTimingGrade)
+    const hitAimWorldX = playerHitAimLateralToWorldX(target.teamSide, hitAimLateral)
+    const hitEffectiveAimLateral = getPlayerHitTimingEffectiveAimLateral(hitAimLateral, hitTimingAccuracyMultiplier)
+    const hitEffectiveAimWorldX = playerHitAimLateralToWorldX(target.teamSide, hitEffectiveAimLateral)
+    const hitAimVelocityX = getPlayerHitAimVelocityX(target.teamSide, hitEffectiveAimLateral)
+    this.state = applyPlayerContactResponse(
+      this.state, respondingContact, hitTimingGrade, hitAimLateral, hitTimingAccuracyMultiplier, hitAimForward,
+    )
+    return createPlayerBallContactResponseEvent(
+      respondingContact, this.state.velocity, hitTiming, hitTimingGrade,
+      hitTimingForwardMultiplier, hitTimingAccuracyMultiplier, hitAimLateral,
+      hitAimWorldX, hitEffectiveAimLateral, hitEffectiveAimWorldX, hitAimVelocityX, hitAimForward,
     )
   }
 
@@ -419,6 +482,8 @@ export class FixedStepVolleyballSimulator {
     this.accumulatedSeconds = 0
     this.simulationStepCount = 0
     this.groundContactOccurred = false
+    this.responseMode = null
+    this.actionResolver.reset()
     this.activePlayerContactIds.clear()
     this.respondedPlayerContactIds.clear()
     this.hitBufferRemainingSecondsByPlayer.clear()
