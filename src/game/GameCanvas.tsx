@@ -1,22 +1,19 @@
 import { Engine } from '@babylonjs/core/Engines/engine'
 import { useEffect, useRef, useState } from 'react'
-import { ActionIntegrationBridge } from '@/game/actions/actionIntegrationBridge'
+import { createFrameActionIntents } from '@/game/actions/actionIntegrationBridge'
 import {
   BallDebugOverlay,
   type BallDebugSnapshot,
 } from '@/game/ball/BallDebugOverlay'
 import type { BallGroundContactEvent } from '@/game/ball/ballGroundContact'
-import { FixedStepVolleyballSimulator } from '@/game/ball/FixedStepVolleyballSimulator'
+import { FixedStepVolleyballSimulator, type ExecutedPlayerAction } from '@/game/ball/FixedStepVolleyballSimulator'
 import { createPreviewVolleyballState } from '@/game/ball/previewVolleyballState'
 import type {
   PlayerBallContactEvent,
   PlayerBallContactTarget,
 } from '@/game/contact/playerBallContact'
 import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallContactResponse'
-import {
-  createPlayerHitIntent,
-  type PlayerHitIntent,
-} from '@/game/contact/playerHitIntent'
+import type { PlayerForearmPassResponseEvent } from '@/game/contact/forearmPassContactResponse'
 import { createGameScene } from '@/game/createGameScene'
 import {
   InputDebugOverlay,
@@ -56,7 +53,6 @@ function GameCanvas() {
     const ballSimulator = new FixedStepVolleyballSimulator(
       createPreviewVolleyballState(),
     )
-    const actionBridge = new ActionIntegrationBridge()
     const movementTargets: PlayerMovementTarget[] = INDOOR_PLAYER_SPAWNS.map(
       ({ playerId, teamSide }) => {
         const playerRoot = playerRoots.get(playerId)
@@ -73,21 +69,20 @@ function GameCanvas() {
     let lastLanding: BallGroundContactEvent | null = null
     let lastPlayerContact: PlayerBallContactEvent | null = null
     let lastContactResponse: PlayerBallContactResponseEvent | null = null
+    let lastForearmPassResponse: PlayerForearmPassResponseEvent | null = null
+    const lastExecutedActions = new Map<string, ExecutedPlayerAction>()
     let resetPreviewOnNextFrame = false
 
     inputManager.start()
     const renderScene = () => {
       if (resetPreviewOnNextFrame) {
         ballSimulator.reset(createPreviewVolleyballState())
-        actionBridge.reset()
+        lastExecutedActions.clear()
         resetPreviewOnNextFrame = false
       }
 
       const snapshots = inputManager.update()
-      actionBridge.capture(snapshots, ballSimulator.totalSimulationSteps)
-      const playerHitIntents: PlayerHitIntent[] = snapshots.map(
-        createPlayerHitIntent,
-      )
+      const actionIntents = createFrameActionIntents(snapshots)
       const frameDeltaSeconds = engine.getDeltaTime() / 1000
 
       movementController.update(snapshots, frameDeltaSeconds)
@@ -101,22 +96,28 @@ function GameCanvas() {
             z: position.z,
           },
         }))
-      const advanceResult = ballSimulator.advance(
+      const advanceResult = ballSimulator.advanceWithActions(
         frameDeltaSeconds,
         playerContactTargets,
-        playerHitIntents,
+        actionIntents,
       )
-      actionBridge.observeSteps(advanceResult.executedSteps)
+
+      if (import.meta.env.DEV) {
+        for (const { executedAction } of advanceResult.actionSteps) {
+          if (executedAction) lastExecutedActions.set(executedAction.action.playerId, executedAction)
+        }
+      }
 
       for (const event of advanceResult.events) {
         if (event.type === 'GROUND_CONTACT') {
-          actionBridge.suspend()
           lastLanding = event
           resetPreviewOnNextFrame = true
         } else if (event.type === 'PLAYER_CONTACT') {
           lastPlayerContact = event
         } else if (event.type === 'PLAYER_CONTACT_RESPONSE') {
           lastContactResponse = event
+        } else if (event.type === 'PLAYER_FOREARM_PASS_RESPONSE') {
+          lastForearmPassResponse = event
         }
       }
 
@@ -134,7 +135,7 @@ function GameCanvas() {
         performance.now() - lastDebugUpdate >=
           LOCAL_INPUT_CONFIG.debugUpdateIntervalMs
       ) {
-        const shadowSnapshots = actionBridge.getSnapshots()
+        const { simulationStep, selectedActions } = advanceResult.lastActionStep
         setDebugSnapshots(
           snapshots.flatMap((snapshot) => {
             const playerRoot = playerRoots.get(snapshot.playerId)
@@ -146,7 +147,9 @@ function GameCanvas() {
               ? [
                   {
                     ...snapshot,
-                    shadowAction: shadowSnapshots.find(({ playerId }) => playerId === snapshot.playerId),
+                    simulationStep,
+                    selectedAction: selectedActions.find(({ playerId }) => playerId === snapshot.playerId) ?? null,
+                    lastExecutedAction: lastExecutedActions.get(snapshot.playerId) ?? null,
                     position: {
                       x: playerRoot.position.x,
                       y: playerRoot.position.y,
@@ -167,6 +170,7 @@ function GameCanvas() {
           lastLanding,
           lastPlayerContact,
           lastContactResponse,
+          lastForearmPassResponse,
         })
         lastDebugUpdate = performance.now()
       }

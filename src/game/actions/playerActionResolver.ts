@@ -1,6 +1,8 @@
 import type { PlayerActionIntent } from '@/game/actions/playerActionIntent'
 import type { ForearmPassIntent } from '@/game/actions/forearmPassIntent'
 
+export type PlayerCommandIntent = PlayerActionIntent | ForearmPassIntent
+
 export type ResolvableActionType = PlayerActionIntent['actionType'] | ForearmPassIntent['actionType']
 
 export interface PendingPlayerAction {
@@ -11,7 +13,7 @@ export interface PendingPlayerAction {
   readonly aimForward: number
 }
 
-// Isolated resolver convention: 0.1 seconds at 60 Hz, eligible at ages 0 through 5.
+// 0.1 seconds at 60 Hz, eligible at ages 0 through 5.
 const BUFFER_STEPS = 6
 
 /** Selects pending commands only; does not execute contacts or decide sporting validity. */
@@ -20,7 +22,7 @@ export class PlayerActionResolver {
   #currentStep = 0
 
   /** Capture at the supplied simulation step. Held-only snapshots do not renew a candidate. */
-  capture(intent: PlayerActionIntent | ForearmPassIntent, pressStep: number): PendingPlayerAction | null {
+  capture(intent: PlayerCommandIntent, pressStep: number): PendingPlayerAction | null {
     this.advanceTo(pressStep)
     const pressed = intent.actionType === 'GENERIC_HIT' ? intent.hitPressed : intent.forearmPassPressed
     if (!pressed) return null
@@ -43,6 +45,19 @@ export class PlayerActionResolver {
 
   select(playerId: string, currentStep: number): PendingPlayerAction | null {
     this.advanceTo(currentStep)
+    return this.selectedForPlayer(playerId)
+  }
+
+  /** Uses the same priority as select(), with one clock advance for all players. */
+  selectAll(currentStep: number): readonly PendingPlayerAction[] {
+    this.advanceTo(currentStep)
+    return Object.freeze([...this.#pending.keys()].sort().flatMap((playerId) => {
+      const selected = this.selectedForPlayer(playerId)
+      return selected ? [selected] : []
+    }))
+  }
+
+  private selectedForPlayer(playerId: string): PendingPlayerAction | null {
     const candidates = this.#pending.get(playerId)
     const hit = candidates?.get('GENERIC_HIT')
     const pass = candidates?.get('FOREARM_PASS')

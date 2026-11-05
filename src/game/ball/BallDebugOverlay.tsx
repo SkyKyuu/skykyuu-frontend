@@ -3,6 +3,7 @@ import type { BallGroundContactEvent } from '@/game/ball/ballGroundContact'
 import { VOLLEYBALL_SIMULATION_CONFIG } from '@/game/ball/volleyballSimulationConfig'
 import type { PlayerBallContactEvent } from '@/game/contact/playerBallContact'
 import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallContactResponse'
+import type { PlayerForearmPassResponseEvent } from '@/game/contact/forearmPassContactResponse'
 
 interface BallDebugOverlayProps {
   snapshot: BallDebugSnapshot | null
@@ -16,6 +17,7 @@ export interface BallDebugSnapshot {
   lastLanding: BallGroundContactEvent | null
   lastPlayerContact: PlayerBallContactEvent | null
   lastContactResponse: PlayerBallContactResponseEvent | null
+  lastForearmPassResponse?: PlayerForearmPassResponseEvent | null
 }
 
 function formatValue(value: number): string {
@@ -38,7 +40,7 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
   return (
     <aside
       aria-label="Volleyball simulation debug"
-      className="pointer-events-none absolute right-3 top-3 z-10 w-64 rounded-lg border border-slate-600/70 bg-slate-950/85 p-3 font-mono text-xs text-slate-100 shadow-xl backdrop-blur-sm"
+      className="absolute right-3 top-3 z-10 max-h-[calc(100vh-1.5rem)] w-64 overflow-y-auto rounded-lg border border-slate-600/70 bg-slate-950/85 p-3 font-mono text-xs text-slate-100 shadow-xl backdrop-blur-sm"
     >
       <div className="text-sm font-semibold tracking-wide text-amber-300">
         Volleyball Simulation
@@ -95,6 +97,23 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
           <dd>{formatValue(snapshot.lastPlayerContact.ballPosition.z)}</dd>
           <dt>Ball Vy</dt>
           <dd>{formatValue(snapshot.lastPlayerContact.ballVelocity.y)}</dd>
+        </dl>
+      ) : null}
+      {snapshot.lastForearmPassResponse ? (
+        <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 border-t border-slate-700 pt-2">
+          <dt className="col-span-2 font-semibold text-emerald-300">Last Forearm Pass Response</dt>
+          <dt>Player ID</dt>
+          <dd>{snapshot.lastForearmPassResponse.playerId}</dd>
+          <dt>Team</dt>
+          <dd>{snapshot.lastForearmPassResponse.teamSide}</dd>
+          <dt>Press Step</dt>
+          <dd>{snapshot.lastForearmPassResponse.pressStep}</dd>
+          <dt>Contact Entry Step</dt>
+          <dd>{snapshot.lastForearmPassResponse.contactStep}</dd>
+          <dt>Pass Timing</dt>
+          <dd>{snapshot.lastForearmPassResponse.timingGrade}</dd>
+          <dt>Pass Outgoing Velocity</dt>
+          <dd>{[snapshot.lastForearmPassResponse.outgoingVelocity.x, snapshot.lastForearmPassResponse.outgoingVelocity.y, snapshot.lastForearmPassResponse.outgoingVelocity.z].map(formatValue).join(', ')}</dd>
         </dl>
       ) : null}
       {snapshot.lastContactResponse ? (
