@@ -13,6 +13,8 @@ import {
 import { PLACEHOLDER_PLAYER } from '@/game/player/playerDimensions'
 import type { TeamSide } from '@/game/team/teamTypes'
 
+type PlayerMovementInput = Pick<LocalPlayerInputSnapshot, 'playerId' | 'worldMove' | 'jumpPressed'>
+
 export interface PlayerMovementTarget {
   playerId: string
   teamSide: TeamSide
@@ -59,8 +61,8 @@ export class PlayerMovementController {
     }
   }
 
-  update(
-    snapshots: readonly LocalPlayerInputSnapshot[],
+  update<Input extends PlayerMovementInput>(
+    snapshots: readonly Input[],
     deltaSeconds: number,
   ): void {
     const safeDeltaSeconds = getSafeDeltaSeconds(deltaSeconds)

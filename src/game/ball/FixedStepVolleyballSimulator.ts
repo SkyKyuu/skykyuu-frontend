@@ -118,6 +118,11 @@ export class FixedStepVolleyballSimulator {
     return copyVolleyballState(this.state)
   }
 
+  /** Discard pending action edges when a player loses their input device. */
+  clearPlayerActions(playerId: string): void {
+    this.actionResolver.clearPlayer(playerId)
+  }
+
   advance(
     frameDeltaSeconds: number,
     playerContactTargets: readonly PlayerBallContactTarget[] = [],
