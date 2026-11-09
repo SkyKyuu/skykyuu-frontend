@@ -15,6 +15,8 @@ export interface BallDebugSnapshot {
   velocity: BallVector3
   accumulatorSeconds: number
   totalSimulationSteps: number
+  sceneTick?: number
+  executedSceneSteps?: number
   lastLanding: BallGroundContactEvent | null
   lastPlayerContact: PlayerBallContactEvent | null
   lastContactResponse: PlayerBallContactResponseEvent | null
@@ -65,6 +67,14 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
         <dd>{formatValue(snapshot.accumulatorSeconds)}</dd>
         <dt>Simulation Steps</dt>
         <dd>{snapshot.totalSimulationSteps}</dd>
+        {snapshot.sceneTick !== undefined ? (
+          <>
+            <dt>Scene Tick</dt>
+            <dd>{snapshot.sceneTick}</dd>
+            <dt>Steps This Frame</dt>
+            <dd>{snapshot.executedSceneSteps}</dd>
+          </>
+        ) : null}
         <dt>Fixed Hz</dt>
         <dd>{fixedHz.toFixed(0)}</dd>
       </dl>

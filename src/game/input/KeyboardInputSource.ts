@@ -21,7 +21,8 @@ export class KeyboardInputSource {
     }
 
     event.preventDefault()
-    this.pressedCodes.add(event.code)
+    // Auto-repeat after blur must not create a fresh press.
+    if (!event.repeat) this.pressedCodes.add(event.code)
   }
 
   private readonly handleKeyUp = (event: KeyboardEvent) => {
