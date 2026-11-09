@@ -17,7 +17,8 @@ function input(overrides: Partial<LocalPlayerInputSnapshot> = {}): LocalPlayerIn
     playerId: 'a', teamSide: 'A', deviceKind: 'keyboard', deviceName: 'Keyboard', deviceConnected: true,
     localMove: { lateral: -Math.SQRT1_2, forward: Math.SQRT1_2 }, worldMove: { worldX: 0, worldZ: 0 },
     jumpHeld: false, jumpPressed: false, hitHeld: false, hitPressed: false,
-    forearmPassHeld: false, forearmPassPressed: false, ...overrides,
+    forearmPassHeld: false, forearmPassPressed: false,
+    setHeld: false, setPressed: false, ...overrides,
   }
 }
 

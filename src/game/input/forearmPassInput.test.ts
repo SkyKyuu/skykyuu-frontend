@@ -36,9 +36,9 @@ describe('forearm pass input sources', () => {
       maxLocalPlayers: 4, gamepadDeadzone: 0.15, debugUpdateIntervalMs: 100,
       keyboardCodes: {
         forward: 'KeyW', backward: 'KeyS', left: 'KeyA', right: 'KeyD',
-        jump: 'Space', hit: 'KeyE', forearmPass: 'KeyQ',
+        jump: 'Space', hit: 'KeyE', forearmPass: 'KeyQ', set: 'KeyR',
       },
-      gamepadButtons: { jump: 0, hit: 1, forearmPass: 4 },
+      gamepadButtons: { jump: 0, hit: 1, forearmPass: 4, set: 2 },
     })
   })
 

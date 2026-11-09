@@ -4,6 +4,36 @@ import { BallDebugOverlay } from '@/game/ball/BallDebugOverlay'
 import { FixedStepVolleyballSimulator } from '@/game/ball/FixedStepVolleyballSimulator'
 import { VOLLEYBALL_SIMULATION_CONFIG } from '@/game/ball/volleyballSimulationConfig'
 
+it('renders the applied set event and clears the section when its session ends', () => {
+  const sim = new FixedStepVolleyballSimulator({
+    position: { x: 0, y: 1, z: 0 }, velocity: { x: 0.4, y: 0, z: 0 },
+  })
+  const { events } = sim.advanceWithActions(
+    VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds,
+    [{ playerId: 'setter', teamSide: 'B', position: { x: 0, y: 0, z: 0 } }],
+    [{ actionType: 'SET', playerId: 'setter', setHeld: true, setPressed: true, aimLateral: 0.5, aimForward: -1 }],
+  )
+  const lastSetResponse = events.find((event) => event.type === 'PLAYER_SET_RESPONSE')
+  expect(lastSetResponse).toBeDefined()
+  const snapshot = {
+    ...sim.getState(), accumulatorSeconds: sim.accumulatorSeconds, totalSimulationSteps: sim.totalSimulationSteps,
+    lastLanding: null, lastPlayerContact: null, lastContactResponse: null, lastSetResponse,
+  }
+  const view = render(<BallDebugOverlay snapshot={snapshot} />)
+  expect(screen.getByText('Last Set Response')).toBeInTheDocument()
+  expect(screen.getByText('Player ID').nextElementSibling).toHaveTextContent('setter')
+  expect(screen.getByText('Team').nextElementSibling).toHaveTextContent('B')
+  expect(screen.getByText('Contact Entry Step').nextElementSibling).toHaveTextContent('0')
+  expect(screen.getByText('Timing Grade').nextElementSibling).toHaveTextContent('PERFECT')
+  expect(screen.getByText('Aim Lateral').nextElementSibling).toHaveTextContent('+0.500')
+  expect(screen.getByText('Aim Forward').nextElementSibling).toHaveTextContent('-1.000')
+  expect(screen.getByText('Outgoing Velocity X').nextElementSibling).toHaveTextContent('-0.700')
+  expect(screen.getByText('Outgoing Velocity Y').nextElementSibling).toHaveTextContent('7.000')
+  expect(screen.getByText('Outgoing Velocity Z').nextElementSibling).toHaveTextContent('0.400')
+  view.rerender(<BallDebugOverlay snapshot={{ ...snapshot, lastSetResponse: null }} />)
+  expect(screen.queryByText('Last Set Response')).not.toBeInTheDocument()
+})
+
 describe('BallDebugOverlay forward telemetry', () => {
   it.each([
     [Math.SQRT1_2, '+0.707', '+1.414', '6.414'],

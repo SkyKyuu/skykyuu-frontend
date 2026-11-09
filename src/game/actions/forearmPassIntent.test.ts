@@ -12,7 +12,8 @@ function snapshot(overrides: Partial<LocalPlayerInputSnapshot> = {}): LocalPlaye
     playerId: 'player', teamSide: 'A', deviceKind: 'keyboard', deviceName: 'Keyboard', deviceConnected: true,
     localMove: { lateral: 0.375, forward: -0.25 }, worldMove: { worldX: -1, worldZ: 1 },
     jumpHeld: false, jumpPressed: false, hitHeld: false, hitPressed: false,
-    forearmPassHeld: true, forearmPassPressed: true, ...overrides,
+    forearmPassHeld: true, forearmPassPressed: true,
+    setHeld: false, setPressed: false, ...overrides,
   }
 }
 

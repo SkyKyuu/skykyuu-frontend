@@ -64,6 +64,7 @@ export class KeyboardInputSource {
       jumpHeld: this.pressedCodes.has(keyboardCodes.jump),
       hitHeld: this.pressedCodes.has(keyboardCodes.hit),
       forearmPassHeld: this.pressedCodes.has(keyboardCodes.forearmPass),
+      setHeld: this.pressedCodes.has(keyboardCodes.set),
     }
   }
 

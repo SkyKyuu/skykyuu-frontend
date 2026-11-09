@@ -1,9 +1,10 @@
 import type { PlayerActionIntent } from '@/game/actions/playerActionIntent'
 import type { ForearmPassIntent } from '@/game/actions/forearmPassIntent'
+import type { SetIntent } from '@/game/actions/setIntent'
 
-export type PlayerCommandIntent = PlayerActionIntent | ForearmPassIntent
+export type PlayerCommandIntent = PlayerActionIntent | ForearmPassIntent | SetIntent
 
-export type ResolvableActionType = PlayerActionIntent['actionType'] | ForearmPassIntent['actionType']
+export type ResolvableActionType = PlayerCommandIntent['actionType']
 
 export interface PendingPlayerAction {
   readonly playerId: string
@@ -15,6 +16,15 @@ export interface PendingPlayerAction {
 
 // 0.1 seconds at 60 Hz, eligible at ages 0 through 5.
 const BUFFER_STEPS = 6
+const SAME_STEP_PRIORITY = ['SET', 'FOREARM_PASS', 'GENERIC_HIT'] as const
+
+export function isPlayerCommandPressed(intent: PlayerCommandIntent): boolean {
+  switch (intent.actionType) {
+    case 'GENERIC_HIT': return intent.hitPressed
+    case 'FOREARM_PASS': return intent.forearmPassPressed
+    case 'SET': return intent.setPressed
+  }
+}
 
 /** Selects pending commands only; does not execute contacts or decide sporting validity. */
 export class PlayerActionResolver {
@@ -24,8 +34,7 @@ export class PlayerActionResolver {
   /** Capture at the supplied simulation step. Held-only snapshots do not renew a candidate. */
   capture(intent: PlayerCommandIntent, pressStep: number): PendingPlayerAction | null {
     this.advanceTo(pressStep)
-    const pressed = intent.actionType === 'GENERIC_HIT' ? intent.hitPressed : intent.forearmPassPressed
-    if (!pressed) return null
+    if (!isPlayerCommandPressed(intent)) return null
 
     const action: PendingPlayerAction = Object.freeze({
       playerId: intent.playerId,
@@ -59,11 +68,14 @@ export class PlayerActionResolver {
 
   private selectedForPlayer(playerId: string): PendingPlayerAction | null {
     const candidates = this.#pending.get(playerId)
-    const hit = candidates?.get('GENERIC_HIT')
-    const pass = candidates?.get('FOREARM_PASS')
-    if (!hit) return pass ?? null
-    if (!pass) return hit
-    return pass.pressStep <= hit.pressStep ? pass : hit
+    let selected: PendingPlayerAction | null = null
+    for (const type of SAME_STEP_PRIORITY) {
+      const candidate = candidates?.get(type)
+      if (candidate && (!selected || candidate.pressStep < selected.pressStep)) {
+        selected = candidate
+      }
+    }
+    return selected
   }
 
   /** Requires the exact snapshot returned by this instance, still selected at currentStep. */

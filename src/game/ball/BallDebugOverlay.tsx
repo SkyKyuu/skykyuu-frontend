@@ -4,6 +4,7 @@ import { VOLLEYBALL_SIMULATION_CONFIG } from '@/game/ball/volleyballSimulationCo
 import type { PlayerBallContactEvent } from '@/game/contact/playerBallContact'
 import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallContactResponse'
 import type { PlayerForearmPassResponseEvent } from '@/game/contact/forearmPassContactResponse'
+import type { PlayerSetResponseEvent } from '@/game/contact/setContactResponse'
 
 interface BallDebugOverlayProps {
   snapshot: BallDebugSnapshot | null
@@ -18,6 +19,7 @@ export interface BallDebugSnapshot {
   lastPlayerContact: PlayerBallContactEvent | null
   lastContactResponse: PlayerBallContactResponseEvent | null
   lastForearmPassResponse?: PlayerForearmPassResponseEvent | null
+  lastSetResponse?: PlayerSetResponseEvent | null
 }
 
 function formatValue(value: number): string {
@@ -36,6 +38,7 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
   }
 
   const fixedHz = 1 / VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds
+  const setResponse = snapshot.lastSetResponse
 
   return (
     <aside
@@ -97,6 +100,31 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
           <dd>{formatValue(snapshot.lastPlayerContact.ballPosition.z)}</dd>
           <dt>Ball Vy</dt>
           <dd>{formatValue(snapshot.lastPlayerContact.ballVelocity.y)}</dd>
+        </dl>
+      ) : null}
+      {setResponse ? (
+        <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 border-t border-slate-700 pt-2">
+          <dt className="col-span-2 font-semibold text-emerald-300">Last Set Response</dt>
+          <dt>Player ID</dt>
+          <dd>{setResponse.playerId}</dd>
+          <dt>Team</dt>
+          <dd>{setResponse.teamSide}</dd>
+          <dt>Press Step</dt>
+          <dd>{setResponse.pressStep}</dd>
+          <dt>Contact Entry Step</dt>
+          <dd>{setResponse.contactStep}</dd>
+          <dt>Timing Grade</dt>
+          <dd>{setResponse.timingGrade}</dd>
+          <dt>Aim Lateral</dt>
+          <dd>{formatSignedValue(setResponse.aimLateral, 3)}</dd>
+          <dt>Aim Forward</dt>
+          <dd>{formatSignedValue(setResponse.aimForward, 3)}</dd>
+          <dt>Outgoing Velocity X</dt>
+          <dd>{formatValue(setResponse.outgoingVelocity.x)}</dd>
+          <dt>Outgoing Velocity Y</dt>
+          <dd>{formatValue(setResponse.outgoingVelocity.y)}</dd>
+          <dt>Outgoing Velocity Z</dt>
+          <dd>{formatValue(setResponse.outgoingVelocity.z)}</dd>
         </dl>
       ) : null}
       {snapshot.lastForearmPassResponse ? (
