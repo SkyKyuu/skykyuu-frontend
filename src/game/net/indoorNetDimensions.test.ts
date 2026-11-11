@@ -15,6 +15,7 @@ describe('indoor net dimensions', () => {
       halfLength: 4.75,
       meshSpacing: 0.1,
       topBandHeight: 0.07,
+      bandDepth: 0.025,
       bottomBandHeight: 0.05,
       sideBandWidth: 0.05,
       sideBandHeight: 1,

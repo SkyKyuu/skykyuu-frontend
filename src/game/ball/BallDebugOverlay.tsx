@@ -5,6 +5,8 @@ import type { PlayerBallContactEvent } from '@/game/contact/playerBallContact'
 import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallContactResponse'
 import type { PlayerForearmPassResponseEvent } from '@/game/contact/forearmPassContactResponse'
 import type { PlayerSetResponseEvent } from '@/game/contact/setContactResponse'
+import type { PlayerSpikeResponseEvent } from '@/game/contact/spikeContactResponse'
+import type { RejectedPlayerAction } from '@/game/ball/FixedStepVolleyballSimulator'
 
 interface BallDebugOverlayProps {
   snapshot: BallDebugSnapshot | null
@@ -22,6 +24,8 @@ export interface BallDebugSnapshot {
   lastContactResponse: PlayerBallContactResponseEvent | null
   lastForearmPassResponse?: PlayerForearmPassResponseEvent | null
   lastSetResponse?: PlayerSetResponseEvent | null
+  lastSpikeResponse?: PlayerSpikeResponseEvent | null
+  lastSpikeRejection?: RejectedPlayerAction | null
 }
 
 function formatValue(value: number): string {
@@ -41,6 +45,7 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
 
   const fixedHz = 1 / VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds
   const setResponse = snapshot.lastSetResponse
+  const spikeResponse = snapshot.lastSpikeResponse
 
   return (
     <aside
@@ -110,6 +115,41 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
           <dd>{formatValue(snapshot.lastPlayerContact.ballPosition.z)}</dd>
           <dt>Ball Vy</dt>
           <dd>{formatValue(snapshot.lastPlayerContact.ballVelocity.y)}</dd>
+        </dl>
+      ) : null}
+      {spikeResponse ? (
+        <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 border-t border-slate-700 pt-2">
+          <dt className="col-span-2 font-semibold text-emerald-300">Last Spike Response</dt>
+          <dt>Player</dt>
+          <dd>{spikeResponse.playerId}</dd>
+          <dt>Trajectory</dt>
+          <dd>{spikeResponse.trajectoryMode}</dd>
+          <dt>Press / Entry / Response</dt>
+          <dd>{[spikeResponse.pressStep, spikeResponse.contactStep, spikeResponse.responseStep].join(' / ')}</dd>
+          <dt>Timing</dt>
+          <dd>{spikeResponse.timingGrade}</dd>
+          <dt>Outgoing Velocity</dt>
+          <dd>{[spikeResponse.outgoingVelocity.x, spikeResponse.outgoingVelocity.y, spikeResponse.outgoingVelocity.z].map(formatValue).join(', ')}</dd>
+          {spikeResponse.trajectoryMode === 'MODEL_C' ? (
+            <>
+              <dt>Vertical Bounds</dt>
+              <dd>{[spikeResponse.corridor.vMin, spikeResponse.corridor.vMax].map(formatValue).join(' / ')}</dd>
+            </>
+          ) : (
+            <>
+              <dt>Fallback</dt>
+              <dd>{spikeResponse.fallbackReason}</dd>
+            </>
+          )}
+        </dl>
+      ) : null}
+      {snapshot.lastSpikeRejection ? (
+        <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 border-t border-slate-700 pt-2">
+          <dt className="col-span-2 font-semibold text-amber-300">Last Spike Rejection</dt>
+          <dt>Reason</dt>
+          <dd>{snapshot.lastSpikeRejection.reason}</dd>
+          <dt>Player / Response</dt>
+          <dd>{snapshot.lastSpikeRejection.playerId} / {snapshot.lastSpikeRejection.responseStep}</dd>
         </dl>
       ) : null}
       {setResponse ? (

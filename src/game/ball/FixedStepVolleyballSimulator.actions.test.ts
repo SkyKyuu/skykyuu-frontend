@@ -13,7 +13,7 @@ const INITIAL = { position: { x: 0, y: 1, z: 0 }, velocity: { x: 0.25, y: 0, z: 
 const HIT = 'GENERIC_HIT'
 const PASS = 'FOREARM_PASS'
 const target = (playerId = 'a', teamSide: TeamSide = 'A', x = 0, z = 0) => ({ playerId, teamSide, position: { x, y: 0, z } })
-type PreviousActionType = Exclude<ResolvableActionType, 'SET'>
+type PreviousActionType = Exclude<ResolvableActionType, 'SET' | 'SPIKE'>
 const responseType = (type: PreviousActionType) => type === PASS ? 'PLAYER_FOREARM_PASS_RESPONSE' : 'PLAYER_CONTACT_RESPONSE'
 
 function command(actionType: PreviousActionType, playerId = 'a', aimLateral = 0, aimForward = 0): PlayerCommandIntent {

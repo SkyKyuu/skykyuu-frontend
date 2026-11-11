@@ -48,7 +48,7 @@ describe('Set input and frame capture', () => {
 
   it('binds R and button 2 with the original inputs and deadzone', () => {
     expect(LOCAL_INPUT_CONFIG.keyboardCodes).toMatchObject({ jump: 'Space', hit: 'KeyE', forearmPass: 'KeyQ', set: 'KeyR' })
-    expect(LOCAL_INPUT_CONFIG.gamepadButtons).toEqual({ jump: 0, hit: 1, forearmPass: 4, set: 2 })
+    expect(LOCAL_INPUT_CONFIG.gamepadButtons).toEqual({ jump: 0, hit: 1, forearmPass: 4, set: 2, spike: 3 })
     expect(LOCAL_INPUT_CONFIG.gamepadDeadzone).toBe(0.15)
   })
 

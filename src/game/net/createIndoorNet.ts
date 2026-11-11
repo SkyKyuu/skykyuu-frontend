@@ -12,7 +12,6 @@ import {
 } from '@/game/net/indoorNetDimensions'
 
 const NET_VISUALS = {
-  bandDepth: 0.025,
   postDiameter: 0.08,
   antennaStripeDiameter: INDOOR_NET.antennaDiameter * 1.15,
 } as const
@@ -82,7 +81,7 @@ export function createIndoorNet(
   ) => {
     const band = CreateBox(
       name,
-      { width, height: bandHeight, depth: NET_VISUALS.bandDepth },
+      { width, height: bandHeight, depth: INDOOR_NET.bandDepth },
       scene,
     )
     band.position.set(x, y, INDOOR_NET.z)

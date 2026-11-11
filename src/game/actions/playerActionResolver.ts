@@ -1,8 +1,9 @@
 import type { PlayerActionIntent } from '@/game/actions/playerActionIntent'
 import type { ForearmPassIntent } from '@/game/actions/forearmPassIntent'
 import type { SetIntent } from '@/game/actions/setIntent'
+import type { SpikeIntent } from '@/game/actions/spikeIntent'
 
-export type PlayerCommandIntent = PlayerActionIntent | ForearmPassIntent | SetIntent
+export type PlayerCommandIntent = PlayerActionIntent | ForearmPassIntent | SetIntent | SpikeIntent
 
 export type ResolvableActionType = PlayerCommandIntent['actionType']
 
@@ -16,13 +17,14 @@ export interface PendingPlayerAction {
 
 // 0.1 seconds at 60 Hz, eligible at ages 0 through 5.
 const BUFFER_STEPS = 6
-const SAME_STEP_PRIORITY = ['SET', 'FOREARM_PASS', 'GENERIC_HIT'] as const
+const SAME_STEP_PRIORITY = ['SPIKE', 'SET', 'FOREARM_PASS', 'GENERIC_HIT'] as const
 
 export function isPlayerCommandPressed(intent: PlayerCommandIntent): boolean {
   switch (intent.actionType) {
     case 'GENERIC_HIT': return intent.hitPressed
     case 'FOREARM_PASS': return intent.forearmPassPressed
     case 'SET': return intent.setPressed
+    case 'SPIKE': return intent.spikePressed
   }
 }
 

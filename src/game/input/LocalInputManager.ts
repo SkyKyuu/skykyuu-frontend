@@ -8,6 +8,7 @@ import { localMoveToWorld } from '@/game/input/inputMath'
 import type {
   InputSourceState,
   LocalInputBinding,
+  LocalMoveInput,
   LocalPlayerInputSnapshot,
 } from '@/game/input/inputTypes'
 import { validateLocalInputBindings } from '@/game/input/previewInputBindings'
@@ -15,6 +16,17 @@ import { validateLocalInputBindings } from '@/game/input/previewInputBindings'
 interface LocalInputManagerOptions {
   keyboardTarget?: Window
   gamepadProvider?: GamepadProvider
+}
+
+interface SampledInputSnapshot extends LocalPlayerInputSnapshot {
+  spikeHeld: boolean
+  spikePressed: boolean
+}
+
+interface GamepadSpikeSample {
+  index: number
+  name: string
+  held: boolean
 }
 
 function createNeutralSourceState(binding: LocalInputBinding): InputSourceState {
@@ -26,6 +38,7 @@ function createNeutralSourceState(binding: LocalInputBinding): InputSourceState 
     hitHeld: false,
     forearmPassHeld: false,
     setHeld: false,
+    spikeHeld: false,
   }
 }
 
@@ -37,7 +50,8 @@ export class LocalInputManager {
   private readonly previousHitHeld = new Map<string, boolean>()
   private readonly previousForearmPassHeld = new Map<string, boolean>()
   private readonly previousSetHeld = new Map<string, boolean>()
-  private snapshots: readonly LocalPlayerInputSnapshot[]
+  private readonly previousGamepadSpike = new Map<string, GamepadSpikeSample>()
+  private snapshots: readonly SampledInputSnapshot[]
   private started = false
 
   private readonly gamepadProvider: GamepadProvider
@@ -91,7 +105,7 @@ export class LocalInputManager {
     this.started = true
   }
 
-  update(): readonly LocalPlayerInputSnapshot[] {
+  update(): readonly SampledInputSnapshot[] {
     let gamepads: ReturnType<GamepadProvider> = []
 
     if (this.gamepadSources.size > 0) {
@@ -103,11 +117,28 @@ export class LocalInputManager {
     }
 
     this.snapshots = this.bindings.map((binding) => {
-      const sourceState =
-        binding.deviceKind === 'keyboard'
-          ? (this.keyboardSource?.read() ?? createNeutralSourceState(binding))
-          : (this.gamepadSources.get(binding.playerId)?.read(gamepads) ??
-            createNeutralSourceState(binding))
+      const gamepadState = this.gamepadSources.get(binding.playerId)?.read(gamepads)
+      const sourceState = (
+        binding.deviceKind === 'keyboard' ? this.keyboardSource?.read() : gamepadState
+      ) ?? createNeutralSourceState(binding)
+      const spikePressAim = binding.deviceKind === 'keyboard'
+        ? this.keyboardSource?.takeSpikePressAim()
+        : undefined
+      let spikePressed = spikePressAim !== undefined
+      if (gamepadState?.gamepadIndex !== undefined) {
+        const previous = this.previousGamepadSpike.get(binding.playerId)
+        // Treat a newly connected or reassigned device as a held-state baseline.
+        spikePressed = gamepadState.spikeHeld && previous !== undefined &&
+          previous.index === gamepadState.gamepadIndex && previous.name === gamepadState.deviceName &&
+          !previous.held
+        this.previousGamepadSpike.set(binding.playerId, {
+          index: gamepadState.gamepadIndex,
+          name: gamepadState.deviceName,
+          held: gamepadState.spikeHeld,
+        })
+      } else {
+        this.previousGamepadSpike.delete(binding.playerId)
+      }
       const wasJumpHeld = this.previousJumpHeld.get(binding.playerId) ?? false
       const jumpPressed = sourceState.jumpHeld && !wasJumpHeld
       const wasHitHeld = this.previousHitHeld.get(binding.playerId) ?? false
@@ -128,13 +159,15 @@ export class LocalInputManager {
         hitPressed,
         forearmPassPressed,
         setPressed,
+        spikePressed,
+        spikePressAim,
       )
     })
 
     return this.snapshots
   }
 
-  getSnapshots(): readonly LocalPlayerInputSnapshot[] {
+  getSnapshots(): readonly SampledInputSnapshot[] {
     return this.snapshots
   }
 
@@ -144,6 +177,10 @@ export class LocalInputManager {
     this.previousHitHeld.clear()
     this.previousForearmPassHeld.clear()
     this.previousSetHeld.clear()
+    this.previousGamepadSpike.clear()
+    this.snapshots = this.snapshots.map((snapshot) => ({
+      ...snapshot, spikeHeld: false, spikePressed: false, spikePressAim: undefined,
+    }))
     this.started = false
   }
 
@@ -154,7 +191,9 @@ export class LocalInputManager {
     hitPressed: boolean,
     forearmPassPressed: boolean,
     setPressed: boolean,
-  ): LocalPlayerInputSnapshot {
+    spikePressed = false,
+    spikePressAim?: Readonly<LocalMoveInput>,
+  ): SampledInputSnapshot {
     return {
       playerId: binding.playerId,
       teamSide: binding.teamSide,
@@ -171,6 +210,9 @@ export class LocalInputManager {
       forearmPassPressed,
       setHeld: sourceState.setHeld,
       setPressed,
+      spikeHeld: sourceState.spikeHeld,
+      spikePressed,
+      spikePressAim,
     }
   }
 }

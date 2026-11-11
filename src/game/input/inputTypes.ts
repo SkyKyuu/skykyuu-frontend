@@ -33,6 +33,7 @@ export interface InputSourceState {
   hitHeld: boolean
   forearmPassHeld: boolean
   setHeld: boolean
+  spikeHeld: boolean
 }
 
 export interface LocalPlayerInputSnapshot {
@@ -51,4 +52,8 @@ export interface LocalPlayerInputSnapshot {
   forearmPassPressed: boolean
   setHeld: boolean
   setPressed: boolean
+  spikeHeld?: boolean
+  spikePressed?: boolean
+  /** Keyboard aim captured at keydown, before the next poll. */
+  spikePressAim?: Readonly<LocalMoveInput>
 }

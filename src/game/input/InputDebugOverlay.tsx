@@ -92,6 +92,10 @@ export function InputDebugOverlay({ snapshots }: InputDebugOverlayProps) {
             <dd>{snapshot.setHeld ? 'true' : 'false'}</dd>
             <dt>Set Pressed</dt>
             <dd>{snapshot.setPressed ? 'true' : 'false'}</dd>
+            <dt>Spike Held</dt>
+            <dd>{snapshot.spikeHeld ? 'true' : 'false'}</dd>
+            <dt>Spike Pressed</dt>
+            <dd>{snapshot.spikePressed ? 'true' : 'false'}</dd>
             <dt title="Selection at this step before any response">Selected Action</dt>
             <dd>{snapshot.selectedAction?.actionType ?? '—'}</dd>
             <dt>Selected Press Step</dt>
