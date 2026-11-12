@@ -44,6 +44,7 @@ import { getPlayerHitTimingAccuracyMultiplier } from '@/game/contact/playerHitTi
 import { getPlayerHitTimingEffectiveAimLateral } from '@/game/contact/playerHitTimingAccuracyAim'
 import { getPlayerHitTimingForwardMultiplier } from '@/game/contact/playerHitTimingPower'
 import { createSetContactResponse, type PlayerSetResponseEvent } from '@/game/contact/setContactResponse'
+import { createSpikeContactResponse, type PlayerSpikeResponseEvent } from '@/game/contact/spikeContactResponse'
 
 const STEP_COMPARISON_EPSILON = 1e-12
 
@@ -59,16 +60,30 @@ export interface ExecutedPlayerAction {
   readonly outgoingVelocity: Readonly<BallVector3>
 }
 
+export interface RejectedPlayerAction {
+  readonly playerId: string
+  readonly actionType: 'SPIKE'
+  readonly pressStep: number
+  readonly responseStep: number
+  readonly reason: 'GROUNDED' | 'POSE_UNAVAILABLE'
+}
+
 export interface ActionStepObservation {
   readonly simulationStep: number
   /** Selections before response, including commands that did not get a contact. */
   readonly selectedActions: readonly PendingPlayerAction[]
   readonly executedAction: ExecutedPlayerAction | null
+  readonly rejectedActions?: readonly RejectedPlayerAction[]
 }
 
 export interface ActionSimulationAdvanceResult extends BallSimulationAdvanceResult {
   readonly actionSteps: readonly ActionStepObservation[]
   readonly lastActionStep: ActionStepObservation
+}
+
+interface SelectedContactAction {
+  target: PlayerBallContactTarget
+  action: PendingPlayerAction
 }
 
 interface PlayerContactDetectionResult {
@@ -246,16 +261,21 @@ export class FixedStepVolleyballSimulator {
       if (!actionSteps) this.discardBuffersForRespondedOverlaps(overlappingTargets)
       const simulationStep = this.totalSimulationSteps
       const selectedActions = actionSteps ? this.actionResolver.selectAll(simulationStep) : []
-      const respondingTarget = overlappingTargets.find(({ playerId }) => (
-        !this.respondedPlayerContactIds.has(playerId) && (actionSteps
-          ? selectedActions.some((action) => action.playerId === playerId)
-          : (this.hitBufferRemainingSecondsByPlayer.get(playerId) ?? 0) > 0)
-      ))
+      const rejectedActions: RejectedPlayerAction[] = []
+      const selectedResponse = actionSteps
+        ? this.selectContactAction(overlappingTargets, simulationStep, rejectedActions)
+        : undefined
+      const respondingTarget = actionSteps
+        ? selectedResponse?.target
+        : overlappingTargets.find(({ playerId }) => (
+          !this.respondedPlayerContactIds.has(playerId) &&
+          (this.hitBufferRemainingSecondsByPlayer.get(playerId) ?? 0) > 0
+        ))
 
       let executedAction: ExecutedPlayerAction | null = null
       if (respondingTarget) {
         const playerId = respondingTarget.playerId
-        const action = selectedActions.find((candidate) => candidate.playerId === playerId)
+        const action = selectedResponse?.action
         const responseEvent = this.applyResponse(respondingTarget, fixedStepSeconds, action)
         if (action) {
           if (!this.actionResolver.consume(action, simulationStep)) {
@@ -279,7 +299,10 @@ export class FixedStepVolleyballSimulator {
       }
 
       if (actionSteps) {
-        actionSteps.push({ simulationStep, selectedActions, executedAction })
+        actionSteps.push({
+          simulationStep, selectedActions, executedAction,
+          ...(rejectedActions.length > 0 ? { rejectedActions: Object.freeze(rejectedActions) } : {}),
+        })
       } else {
         this.decayPlayerHitBuffers(fixedStepSeconds)
       }
@@ -294,6 +317,33 @@ export class FixedStepVolleyballSimulator {
     }
 
     return { executedSteps, events }
+  }
+
+  private selectContactAction(
+    overlappingTargets: readonly PlayerBallContactTarget[],
+    responseStep: number,
+    rejectedActions: RejectedPlayerAction[],
+  ): SelectedContactAction | undefined {
+    for (const target of overlappingTargets) {
+      const { playerId, grounded } = target
+      if (this.respondedPlayerContactIds.has(playerId)) continue
+
+      let action = this.actionResolver.select(playerId, responseStep)
+      if (action?.actionType === 'SPIKE' && grounded !== false) {
+        if (!this.actionResolver.cancel(action, responseStep)) {
+          throw new Error(`Selected spike could not be canceled: ${playerId}`)
+        }
+        rejectedActions.push(Object.freeze({
+          playerId,
+          actionType: action.actionType,
+          pressStep: action.pressStep,
+          responseStep,
+          reason: grounded === true ? 'GROUNDED' : 'POSE_UNAVAILABLE',
+        }))
+        action = this.actionResolver.select(playerId, responseStep)
+      }
+      if (action) return { target, action }
+    }
   }
 
   private armPlayerHitBuffers(
@@ -419,7 +469,7 @@ export class FixedStepVolleyballSimulator {
     target: PlayerBallContactTarget,
     fixedStepSeconds: number,
     action?: PendingPlayerAction,
-  ): PlayerBallContactResponseEvent | PlayerForearmPassResponseEvent | PlayerSetResponseEvent {
+  ): PlayerBallContactResponseEvent | PlayerForearmPassResponseEvent | PlayerSetResponseEvent | PlayerSpikeResponseEvent {
     const { playerId } = target
     const pressStep = action?.pressStep ?? this.hitPressStepByPlayer.get(playerId)
     const contactEntryStep = this.contactEntryStepByPlayer.get(playerId)
@@ -434,6 +484,14 @@ export class FixedStepVolleyballSimulator {
     const hitAimLateral = action?.aimLateral ?? this.getResponseHitAimLateral(playerId)
     const hitAimForward = action?.aimForward ?? this.getResponseHitAimForward(playerId)
     switch (action?.actionType) {
+      case 'SPIKE': {
+        const response = createSpikeContactResponse(
+          respondingContact, pressStep, contactEntryStep, this.totalSimulationSteps,
+          fixedStepSeconds, hitAimLateral, hitAimForward,
+        )
+        this.state = { position: { ...this.state.position }, velocity: { ...response.outgoingVelocity } }
+        return response
+      }
       case 'SET':
       case 'FOREARM_PASS': {
         const createResponse = action.actionType === 'SET'

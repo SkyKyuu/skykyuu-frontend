@@ -7,7 +7,7 @@ import type { LocalPlayerInputSnapshot } from '@/game/input/inputTypes'
 import { FixedStepVolleyballSimulator } from '@/game/ball/FixedStepVolleyballSimulator'
 import { VOLLEYBALL_SIMULATION_CONFIG } from '@/game/ball/volleyballSimulationConfig'
 
-type PreviousActionType = Exclude<ResolvableActionType, 'SET'>
+type PreviousActionType = Exclude<ResolvableActionType, 'SET' | 'SPIKE'>
 
 function intent(type: PreviousActionType, playerId = 'player', lateral = 0.375, forward = -0.25): PlayerActionIntent | ForearmPassIntent {
   return type === 'GENERIC_HIT'
@@ -25,7 +25,7 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('isolated player action capture and priority', () => {
   it('exposes only the approved immutable pending data', () => {
-    expectTypeOf<ResolvableActionType>().toEqualTypeOf<'GENERIC_HIT' | 'FOREARM_PASS' | 'SET'>()
+    expectTypeOf<ResolvableActionType>().toEqualTypeOf<'GENERIC_HIT' | 'FOREARM_PASS' | 'SET' | 'SPIKE'>()
     expectTypeOf<PendingPlayerAction>().toEqualTypeOf<Readonly<PendingPlayerAction>>()
     expect(capture(new PlayerActionResolver(), 'GENERIC_HIT', 0)).toEqual({
       playerId: 'player', actionType: 'GENERIC_HIT', pressStep: 0, aimLateral: 0.375, aimForward: -0.25,

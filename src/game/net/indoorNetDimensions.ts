@@ -18,6 +18,7 @@ export const INDOOR_NET = {
   halfLength: netLength / 2,
   meshSpacing,
   topBandHeight: 0.07,
+  bandDepth: 0.025,
   bottomBandHeight: 0.05,
   sideBandWidth: 0.05,
   sideBandHeight: netWidth,

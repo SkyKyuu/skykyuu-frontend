@@ -1,6 +1,7 @@
 import { createForearmPassIntent } from '@/game/actions/forearmPassIntent'
 import { createPlayerActionIntent } from '@/game/actions/playerActionIntent'
 import { createSetIntent } from '@/game/actions/setIntent'
+import { createSpikeIntent } from '@/game/actions/spikeIntent'
 import { PlayerActionResolver, type PlayerCommandIntent, type ResolvableActionType } from '@/game/actions/playerActionResolver'
 import { createPlayerHitIntent } from '@/game/contact/playerHitIntent'
 import type { LocalPlayerInputSnapshot } from '@/game/input/inputTypes'
@@ -19,6 +20,7 @@ export function createFrameActionIntents(snapshots: readonly LocalPlayerInputSna
     if (snapshot.hitPressed) intents.push(createPlayerActionIntent(createPlayerHitIntent(snapshot)))
     if (snapshot.forearmPassPressed) intents.push(createForearmPassIntent(snapshot))
     if (snapshot.setPressed) intents.push(createSetIntent(snapshot))
+    if (snapshot.spikePressed) intents.push(createSpikeIntent(snapshot))
   }
   return intents
 }

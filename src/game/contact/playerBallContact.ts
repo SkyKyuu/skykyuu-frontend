@@ -10,6 +10,7 @@ export interface PlayerBallContactTarget {
   playerId: string
   teamSide: TeamSide
   position: BallVector3
+  readonly grounded?: boolean
 }
 
 export interface PlayerBallContactEvent {

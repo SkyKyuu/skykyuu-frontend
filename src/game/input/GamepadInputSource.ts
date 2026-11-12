@@ -5,7 +5,11 @@ import type { InputSourceState } from '@/game/input/inputTypes'
 export type GamepadList = ArrayLike<Gamepad | null>
 export type GamepadProvider = () => GamepadList
 
-const NEUTRAL_GAMEPAD_STATE: InputSourceState = {
+interface GamepadSourceState extends InputSourceState {
+  gamepadIndex?: number
+}
+
+const NEUTRAL_GAMEPAD_STATE: GamepadSourceState = {
   connected: false,
   deviceName: 'Gamepad',
   localMove: { lateral: 0, forward: 0 },
@@ -13,6 +17,7 @@ const NEUTRAL_GAMEPAD_STATE: InputSourceState = {
   hitHeld: false,
   forearmPassHeld: false,
   setHeld: false,
+  spikeHeld: false,
 }
 
 const BUTTON_PRESS_THRESHOLD = 0.5
@@ -58,7 +63,7 @@ export class GamepadInputSource {
     this.logicalSlot = logicalSlot
   }
 
-  read(gamepads: GamepadList): InputSourceState {
+  read(gamepads: GamepadList): GamepadSourceState {
     const gamepad = getGamepadAtLogicalSlot(gamepads, this.logicalSlot)
 
     if (!gamepad) {
@@ -71,9 +76,11 @@ export class GamepadInputSource {
     const hitButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.hit]
     const forearmPassButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.forearmPass]
     const setButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.set]
+    const spikeButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.spike]
 
     return {
       connected: true,
+      gamepadIndex: gamepad.index,
       deviceName: gamepad.id || `Gamepad ${this.logicalSlot + 1}`,
       localMove: applyRadialDeadzone(
         { lateral, forward },
@@ -92,6 +99,9 @@ export class GamepadInputSource {
       ),
       setHeld: Boolean(
         setButton?.pressed || (setButton?.value ?? 0) > BUTTON_PRESS_THRESHOLD,
+      ),
+      spikeHeld: Boolean(
+        spikeButton?.pressed || (spikeButton?.value ?? 0) > BUTTON_PRESS_THRESHOLD,
       ),
     }
   }

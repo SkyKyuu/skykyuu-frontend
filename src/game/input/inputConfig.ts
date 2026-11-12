@@ -11,11 +11,13 @@ export const LOCAL_INPUT_CONFIG = {
     hit: 'KeyE',
     forearmPass: 'KeyQ',
     set: 'KeyR',
+    spike: 'KeyF',
   },
   gamepadButtons: {
     jump: 0,
     hit: 1,
     set: 2,
+    spike: 3,
     forearmPass: 4,
   },
 } as const

@@ -16,7 +16,7 @@ const target = (playerId = 'a', teamSide: TeamSide = 'A', x = 0, z = 0) => ({
   playerId, teamSide, position: { x, y: 0, z },
 })
 
-function command(actionType: ResolvableActionType, playerId = 'a', aimLateral = 0, aimForward = 0): PlayerCommandIntent {
+function command(actionType: Exclude<ResolvableActionType, 'SPIKE'>, playerId = 'a', aimLateral = 0, aimForward = 0): PlayerCommandIntent {
   const aim = { playerId, aimLateral, aimForward }
   switch (actionType) {
     case HIT: return { ...aim, actionType, hitHeld: true, hitPressed: true }
@@ -180,7 +180,7 @@ describe('set gameplay in the fixed-step simulator', () => {
   })
 })
 
-type Scheduled = readonly [step: number, type: ResolvableActionType, player?: string, lateral?: number]
+type Scheduled = readonly [step: number, type: Exclude<ResolvableActionType, 'SPIKE'>, player?: string, lateral?: number]
 const cases: readonly (readonly [name: string, entry: number, scheduled: readonly Scheduled[], expected: readonly ResolvableActionType[]])[] = [
   ['set', 0, [[0, SET]], [SET]],
   ['E + R', 0, [[0, HIT], [0, SET]], [SET]],

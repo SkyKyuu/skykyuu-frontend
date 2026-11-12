@@ -8,11 +8,13 @@ import type { BallGroundContactEvent } from '@/game/ball/ballGroundContact'
 import type {
   ActionStepObservation,
   ExecutedPlayerAction,
+  RejectedPlayerAction,
 } from '@/game/ball/FixedStepVolleyballSimulator'
 import type { PlayerBallContactEvent } from '@/game/contact/playerBallContact'
 import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallContactResponse'
 import type { PlayerForearmPassResponseEvent } from '@/game/contact/forearmPassContactResponse'
 import type { PlayerSetResponseEvent } from '@/game/contact/setContactResponse'
+import type { PlayerSpikeResponseEvent } from '@/game/contact/spikeContactResponse'
 import { createGameScene } from '@/game/createGameScene'
 import {
   InputDebugOverlay,
@@ -59,6 +61,8 @@ function GameCanvas() {
     let lastContactResponse: PlayerBallContactResponseEvent | null = null
     let lastForearmPassResponse: PlayerForearmPassResponseEvent | null = null
     let lastSetResponse: PlayerSetResponseEvent | null = null
+    let lastSpikeResponse: PlayerSpikeResponseEvent | null = null
+    let lastSpikeRejection: RejectedPlayerAction | null = null
     const lastExecutedActions = new Map<string, ExecutedPlayerAction>()
 
     inputManager.start()
@@ -88,6 +92,7 @@ function GameCanvas() {
             hitPressed: false,
             forearmPassPressed: false,
             setPressed: false,
+            spikePressed: false,
           } : snapshot
         )) : snapshots)
       }
@@ -98,10 +103,13 @@ function GameCanvas() {
         if (tick.rallyReset) {
           lastExecutedActions.clear()
           lastSetResponse = null
+          lastSpikeResponse = null
+          lastSpikeRejection = null
           lastDebugUpdate = -Infinity
         }
 
         lastActionStep = tick.actionStep
+        lastSpikeRejection = tick.actionStep.rejectedActions?.at(-1) ?? lastSpikeRejection
         const { executedAction } = tick.actionStep
         if (import.meta.env.DEV && executedAction) {
           lastExecutedActions.set(executedAction.action.playerId, executedAction)
@@ -118,6 +126,8 @@ function GameCanvas() {
             lastForearmPassResponse = event
           } else if (event.type === 'PLAYER_SET_RESPONSE') {
             lastSetResponse = event
+          } else if (event.type === 'PLAYER_SPIKE_RESPONSE') {
+            lastSpikeResponse = event
           }
         }
       }
@@ -167,6 +177,8 @@ function GameCanvas() {
           lastContactResponse,
           lastForearmPassResponse,
           lastSetResponse,
+          lastSpikeResponse,
+          lastSpikeRejection,
         })
         lastDebugUpdate = performance.now()
       }
