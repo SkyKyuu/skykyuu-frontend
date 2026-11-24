@@ -5,6 +5,7 @@ import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallCo
 import type { PlayerForearmPassResponseEvent } from '@/game/contact/forearmPassContactResponse'
 import type { PlayerSetResponseEvent } from '@/game/contact/setContactResponse'
 import type { PlayerSpikeResponseEvent } from '@/game/contact/spikeContactResponse'
+import type { PlayerTipResponseEvent } from '@/game/contact/tipContactResponse'
 
 export type CourtResult = 'IN' | 'OUT'
 export type CourtSide = 'A' | 'B' | 'CENTER'
@@ -24,6 +25,7 @@ export type BallSimulationEvent =
   | PlayerForearmPassResponseEvent
   | PlayerSetResponseEvent
   | PlayerSpikeResponseEvent
+  | PlayerTipResponseEvent
 
 export function classifyIndoorCourtResult(position: BallVector3): CourtResult {
   return Math.abs(position.x) <= INDOOR_COURT.halfWidth &&
