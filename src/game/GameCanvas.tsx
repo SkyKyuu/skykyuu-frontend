@@ -15,6 +15,7 @@ import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallCo
 import type { PlayerForearmPassResponseEvent } from '@/game/contact/forearmPassContactResponse'
 import type { PlayerSetResponseEvent } from '@/game/contact/setContactResponse'
 import type { PlayerSpikeResponseEvent } from '@/game/contact/spikeContactResponse'
+import type { PlayerTipResponseEvent } from '@/game/contact/tipContactResponse'
 import { createGameScene } from '@/game/createGameScene'
 import {
   InputDebugOverlay,
@@ -62,7 +63,9 @@ function GameCanvas() {
     let lastForearmPassResponse: PlayerForearmPassResponseEvent | null = null
     let lastSetResponse: PlayerSetResponseEvent | null = null
     let lastSpikeResponse: PlayerSpikeResponseEvent | null = null
-    let lastSpikeRejection: RejectedPlayerAction | null = null
+    let lastSpikeRejection: Extract<RejectedPlayerAction, { actionType: 'SPIKE' }> | null = null
+    let lastTipResponse: PlayerTipResponseEvent | null = null
+    let lastTipRejection: Extract<RejectedPlayerAction, { actionType: 'TIP' }> | null = null
     const lastExecutedActions = new Map<string, ExecutedPlayerAction>()
 
     inputManager.start()
@@ -93,6 +96,7 @@ function GameCanvas() {
             forearmPassPressed: false,
             setPressed: false,
             spikePressed: false,
+            tipPressed: false,
           } : snapshot
         )) : snapshots)
       }
@@ -105,11 +109,16 @@ function GameCanvas() {
           lastSetResponse = null
           lastSpikeResponse = null
           lastSpikeRejection = null
+          lastTipResponse = null
+          lastTipRejection = null
           lastDebugUpdate = -Infinity
         }
 
         lastActionStep = tick.actionStep
-        lastSpikeRejection = tick.actionStep.rejectedActions?.at(-1) ?? lastSpikeRejection
+        for (const rejection of tick.actionStep.rejectedActions ?? []) {
+          if (rejection.actionType === 'SPIKE') lastSpikeRejection = rejection
+          else lastTipRejection = rejection
+        }
         const { executedAction } = tick.actionStep
         if (import.meta.env.DEV && executedAction) {
           lastExecutedActions.set(executedAction.action.playerId, executedAction)
@@ -128,6 +137,8 @@ function GameCanvas() {
             lastSetResponse = event
           } else if (event.type === 'PLAYER_SPIKE_RESPONSE') {
             lastSpikeResponse = event
+          } else if (event.type === 'PLAYER_TIP_RESPONSE') {
+            lastTipResponse = event
           }
         }
       }
@@ -179,6 +190,8 @@ function GameCanvas() {
           lastSetResponse,
           lastSpikeResponse,
           lastSpikeRejection,
+          lastTipResponse,
+          lastTipRejection,
         })
         lastDebugUpdate = performance.now()
       }

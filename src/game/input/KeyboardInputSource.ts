@@ -11,6 +11,7 @@ export class KeyboardInputSource {
   private readonly eventTarget: Window
   private started = false
   private spikePressAim: Readonly<LocalMoveInput> | undefined
+  private tipPressAim: Readonly<LocalMoveInput> | undefined
 
   constructor(eventTarget: Window = window) {
     this.eventTarget = eventTarget
@@ -29,6 +30,9 @@ export class KeyboardInputSource {
       // A later press before polling supersedes this capture on the same tick.
       this.spikePressAim = Object.freeze(this.readLocalMove())
     }
+    if (event.code === LOCAL_INPUT_CONFIG.keyboardCodes.tip) {
+      this.tipPressAim = Object.freeze(this.readLocalMove())
+    }
   }
 
   private readonly handleKeyUp = (event: KeyboardEvent) => {
@@ -43,6 +47,7 @@ export class KeyboardInputSource {
   private readonly handleBlur = () => {
     this.pressedCodes.clear()
     this.spikePressAim = undefined
+    this.tipPressAim = undefined
   }
 
   start(): void {
@@ -59,6 +64,12 @@ export class KeyboardInputSource {
   takeSpikePressAim(): Readonly<LocalMoveInput> | undefined {
     const aim = this.spikePressAim
     this.spikePressAim = undefined
+    return aim
+  }
+
+  takeTipPressAim(): Readonly<LocalMoveInput> | undefined {
+    const aim = this.tipPressAim
+    this.tipPressAim = undefined
     return aim
   }
 
@@ -85,6 +96,7 @@ export class KeyboardInputSource {
       forearmPassHeld: this.pressedCodes.has(keyboardCodes.forearmPass),
       setHeld: this.pressedCodes.has(keyboardCodes.set),
       spikeHeld: this.pressedCodes.has(keyboardCodes.spike),
+      tipHeld: this.pressedCodes.has(keyboardCodes.tip),
     }
   }
 
@@ -97,6 +109,7 @@ export class KeyboardInputSource {
 
     this.pressedCodes.clear()
     this.spikePressAim = undefined
+    this.tipPressAim = undefined
     this.started = false
   }
 }

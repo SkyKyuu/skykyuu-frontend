@@ -238,6 +238,7 @@ describe('GamepadInputSource', () => {
       forearmPassHeld: false,
       setHeld: false,
       spikeHeld: false,
+      tipHeld: false,
     })
   })
 })

@@ -18,6 +18,7 @@ const NEUTRAL_GAMEPAD_STATE: GamepadSourceState = {
   forearmPassHeld: false,
   setHeld: false,
   spikeHeld: false,
+  tipHeld: false,
 }
 
 const BUTTON_PRESS_THRESHOLD = 0.5
@@ -77,6 +78,7 @@ export class GamepadInputSource {
     const forearmPassButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.forearmPass]
     const setButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.set]
     const spikeButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.spike]
+    const tipButton = gamepad.buttons[LOCAL_INPUT_CONFIG.gamepadButtons.tip]
 
     return {
       connected: true,
@@ -102,6 +104,9 @@ export class GamepadInputSource {
       ),
       spikeHeld: Boolean(
         spikeButton?.pressed || (spikeButton?.value ?? 0) > BUTTON_PRESS_THRESHOLD,
+      ),
+      tipHeld: Boolean(
+        tipButton?.pressed || (tipButton?.value ?? 0) > BUTTON_PRESS_THRESHOLD,
       ),
     }
   }

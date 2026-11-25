@@ -12,6 +12,7 @@ export const LOCAL_INPUT_CONFIG = {
     forearmPass: 'KeyQ',
     set: 'KeyR',
     spike: 'KeyF',
+    tip: 'KeyT',
   },
   gamepadButtons: {
     jump: 0,
@@ -19,5 +20,6 @@ export const LOCAL_INPUT_CONFIG = {
     set: 2,
     spike: 3,
     forearmPass: 4,
+    tip: 5,
   },
 } as const

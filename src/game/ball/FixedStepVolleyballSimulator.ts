@@ -45,6 +45,8 @@ import { getPlayerHitTimingEffectiveAimLateral } from '@/game/contact/playerHitT
 import { getPlayerHitTimingForwardMultiplier } from '@/game/contact/playerHitTimingPower'
 import { createSetContactResponse, type PlayerSetResponseEvent } from '@/game/contact/setContactResponse'
 import { createSpikeContactResponse, type PlayerSpikeResponseEvent } from '@/game/contact/spikeContactResponse'
+import { solveTipBallisticTrajectory, type TipTrajectoryRejectionReason } from '@/game/contact/tipBallisticSolver'
+import { createTipContactResponse, type PlayerTipResponseEvent } from '@/game/contact/tipContactResponse'
 
 const STEP_COMPARISON_EPSILON = 1e-12
 
@@ -60,13 +62,16 @@ export interface ExecutedPlayerAction {
   readonly outgoingVelocity: Readonly<BallVector3>
 }
 
-export interface RejectedPlayerAction {
+interface RejectedActionCapture {
   readonly playerId: string
-  readonly actionType: 'SPIKE'
   readonly pressStep: number
   readonly responseStep: number
-  readonly reason: 'GROUNDED' | 'POSE_UNAVAILABLE'
 }
+
+export type RejectedPlayerAction = RejectedActionCapture & (
+  | Readonly<{ actionType: 'SPIKE'; reason: 'GROUNDED' | 'POSE_UNAVAILABLE' }>
+  | Readonly<{ actionType: 'TIP'; reason: 'GROUNDED' | 'POSE_UNAVAILABLE' | TipTrajectoryRejectionReason }>
+)
 
 export interface ActionStepObservation {
   readonly simulationStep: number
@@ -84,6 +89,8 @@ export interface ActionSimulationAdvanceResult extends BallSimulationAdvanceResu
 interface SelectedContactAction {
   target: PlayerBallContactTarget
   action: PendingPlayerAction
+  /** Computed once against the response-tick state, before capture consumption. */
+  tipResponse?: PlayerTipResponseEvent
 }
 
 interface PlayerContactDetectionResult {
@@ -263,7 +270,7 @@ export class FixedStepVolleyballSimulator {
       const selectedActions = actionSteps ? this.actionResolver.selectAll(simulationStep) : []
       const rejectedActions: RejectedPlayerAction[] = []
       const selectedResponse = actionSteps
-        ? this.selectContactAction(overlappingTargets, simulationStep, rejectedActions)
+        ? this.selectContactAction(overlappingTargets, simulationStep, rejectedActions, fixedStepSeconds)
         : undefined
       const respondingTarget = actionSteps
         ? selectedResponse?.target
@@ -276,9 +283,15 @@ export class FixedStepVolleyballSimulator {
       if (respondingTarget) {
         const playerId = respondingTarget.playerId
         const action = selectedResponse?.action
-        const responseEvent = this.applyResponse(respondingTarget, fixedStepSeconds, action)
-        if (action) {
+        if (action?.actionType === 'TIP') {
+          if (!selectedResponse?.tipResponse) throw new Error('TIP requires a validated response before consumption')
           if (!this.actionResolver.consume(action, simulationStep)) {
+            throw new Error(`Selected TIP could not be consumed: ${playerId}`)
+          }
+        }
+        const responseEvent = this.applyResponse(respondingTarget, fixedStepSeconds, action, selectedResponse?.tipResponse)
+        if (action) {
+          if (action.actionType !== 'TIP' && !this.actionResolver.consume(action, simulationStep)) {
             throw new Error(`Selected action could not be consumed: ${playerId}`)
           }
           executedAction = Object.freeze({
@@ -323,26 +336,53 @@ export class FixedStepVolleyballSimulator {
     overlappingTargets: readonly PlayerBallContactTarget[],
     responseStep: number,
     rejectedActions: RejectedPlayerAction[],
+    fixedStepSeconds: number,
   ): SelectedContactAction | undefined {
     for (const target of overlappingTargets) {
       const { playerId, grounded } = target
       if (this.respondedPlayerContactIds.has(playerId)) continue
 
       let action = this.actionResolver.select(playerId, responseStep)
-      if (action?.actionType === 'SPIKE' && grounded !== false) {
-        if (!this.actionResolver.cancel(action, responseStep)) {
-          throw new Error(`Selected spike could not be canceled: ${playerId}`)
+      // Every rejection removes its exact capture; this loop is bounded by the
+      // player's finite pending candidates, without changing target ordering.
+      while (action) {
+        let rejection: RejectedPlayerAction | undefined
+        if ((action.actionType === 'SPIKE' || action.actionType === 'TIP') && grounded !== false) {
+          rejection = Object.freeze({
+            playerId,
+            actionType: action.actionType,
+            pressStep: action.pressStep,
+            responseStep,
+            reason: grounded === true ? 'GROUNDED' : 'POSE_UNAVAILABLE',
+          })
+        } else if (action.actionType === 'TIP') {
+          const contact = createPlayerBallContactEvent(this.state, target)
+          const trajectory = solveTipBallisticTrajectory(
+            contact.ballPosition, contact.teamSide, action.aimLateral, action.aimForward,
+          )
+          if (trajectory.status === 'ADMISSIBLE_TRAJECTORY') {
+            const contactStep = this.contactEntryStepByPlayer.get(playerId)
+            if (contactStep === undefined) throw new Error(`Missing TIP contact entry: ${playerId}`)
+            return {
+              target, action,
+              tipResponse: createTipContactResponse(
+                contact, action.pressStep, contactStep, responseStep, fixedStepSeconds,
+                action.aimLateral, action.aimForward, trajectory,
+              ),
+            }
+          }
+          rejection = Object.freeze({
+            playerId, actionType: 'TIP', pressStep: action.pressStep,
+            responseStep, reason: trajectory.reason,
+          })
         }
-        rejectedActions.push(Object.freeze({
-          playerId,
-          actionType: action.actionType,
-          pressStep: action.pressStep,
-          responseStep,
-          reason: grounded === true ? 'GROUNDED' : 'POSE_UNAVAILABLE',
-        }))
+        if (!rejection) return { target, action }
+        if (!this.actionResolver.cancel(action, responseStep)) {
+          throw new Error(`Selected ${action.actionType} could not be canceled: ${playerId}`)
+        }
+        rejectedActions.push(rejection)
         action = this.actionResolver.select(playerId, responseStep)
       }
-      if (action) return { target, action }
     }
   }
 
@@ -469,7 +509,8 @@ export class FixedStepVolleyballSimulator {
     target: PlayerBallContactTarget,
     fixedStepSeconds: number,
     action?: PendingPlayerAction,
-  ): PlayerBallContactResponseEvent | PlayerForearmPassResponseEvent | PlayerSetResponseEvent | PlayerSpikeResponseEvent {
+    tipResponse?: PlayerTipResponseEvent,
+  ): PlayerBallContactResponseEvent | PlayerForearmPassResponseEvent | PlayerSetResponseEvent | PlayerSpikeResponseEvent | PlayerTipResponseEvent {
     const { playerId } = target
     const pressStep = action?.pressStep ?? this.hitPressStepByPlayer.get(playerId)
     const contactEntryStep = this.contactEntryStepByPlayer.get(playerId)
@@ -484,6 +525,11 @@ export class FixedStepVolleyballSimulator {
     const hitAimLateral = action?.aimLateral ?? this.getResponseHitAimLateral(playerId)
     const hitAimForward = action?.aimForward ?? this.getResponseHitAimForward(playerId)
     switch (action?.actionType) {
+      case 'TIP': {
+        if (!tipResponse) throw new Error('Cannot apply an unvalidated TIP response')
+        this.state = { position: { ...this.state.position }, velocity: { ...tipResponse.outgoingVelocity } }
+        return tipResponse
+      }
       case 'SPIKE': {
         const response = createSpikeContactResponse(
           respondingContact, pressStep, contactEntryStep, this.totalSimulationSteps,

@@ -6,6 +6,7 @@ import type { PlayerBallContactResponseEvent } from '@/game/contact/playerBallCo
 import type { PlayerForearmPassResponseEvent } from '@/game/contact/forearmPassContactResponse'
 import type { PlayerSetResponseEvent } from '@/game/contact/setContactResponse'
 import type { PlayerSpikeResponseEvent } from '@/game/contact/spikeContactResponse'
+import type { PlayerTipResponseEvent } from '@/game/contact/tipContactResponse'
 import type { RejectedPlayerAction } from '@/game/ball/FixedStepVolleyballSimulator'
 
 interface BallDebugOverlayProps {
@@ -25,7 +26,9 @@ export interface BallDebugSnapshot {
   lastForearmPassResponse?: PlayerForearmPassResponseEvent | null
   lastSetResponse?: PlayerSetResponseEvent | null
   lastSpikeResponse?: PlayerSpikeResponseEvent | null
-  lastSpikeRejection?: RejectedPlayerAction | null
+  lastSpikeRejection?: Extract<RejectedPlayerAction, { actionType: 'SPIKE' }> | null
+  lastTipResponse?: PlayerTipResponseEvent | null
+  lastTipRejection?: Extract<RejectedPlayerAction, { actionType: 'TIP' }> | null
 }
 
 function formatValue(value: number): string {
@@ -46,6 +49,7 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
   const fixedHz = 1 / VOLLEYBALL_SIMULATION_CONFIG.fixedStepSeconds
   const setResponse = snapshot.lastSetResponse
   const spikeResponse = snapshot.lastSpikeResponse
+  const tipResponse = snapshot.lastTipResponse
 
   return (
     <aside
@@ -115,6 +119,40 @@ export function BallDebugOverlay({ snapshot }: BallDebugOverlayProps) {
           <dd>{formatValue(snapshot.lastPlayerContact.ballPosition.z)}</dd>
           <dt>Ball Vy</dt>
           <dd>{formatValue(snapshot.lastPlayerContact.ballVelocity.y)}</dd>
+        </dl>
+      ) : null}
+      {tipResponse ? (
+        <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 border-t border-slate-700 pt-2">
+          <dt className="col-span-2 font-semibold text-emerald-300">Last Tip Response</dt>
+          <dt>Player / Team</dt>
+          <dd>{tipResponse.playerId} / {tipResponse.teamSide}</dd>
+          <dt>Press / Entry / Response</dt>
+          <dd>{[tipResponse.pressStep, tipResponse.contactStep, tipResponse.responseStep].join(' / ')}</dd>
+          <dt>Timing</dt>
+          <dd>{tipResponse.timingGrade}</dd>
+          <dt>Aim Lateral / Forward</dt>
+          <dd>{[tipResponse.aimLateral, tipResponse.aimForward].map(formatValue).join(' / ')}</dd>
+          <dt>Target X / Y / Z</dt>
+          <dd>{[tipResponse.targetPosition.x, tipResponse.targetPosition.y, tipResponse.targetPosition.z].map(formatValue).join(' / ')}</dd>
+          <dt>Flight Time</dt>
+          <dd>{formatValue(tipResponse.flightTimeSeconds)}</dd>
+          <dt>Admissible Time</dt>
+          <dd>{[tipResponse.admissibleTimeInterval.min, tipResponse.admissibleTimeInterval.max].map(formatValue).join(' / ')}</dd>
+          <dt>Speed / Apex</dt>
+          <dd>{[tipResponse.initialSpeed, tipResponse.apexHeight].map(formatValue).join(' / ')}</dd>
+          <dt>Net Clearance Entry / Exit</dt>
+          <dd>{[tipResponse.netEntryClearance, tipResponse.netExitClearance].map(formatValue).join(' / ')}</dd>
+          <dt>Outgoing Velocity</dt>
+          <dd>{[tipResponse.outgoingVelocity.x, tipResponse.outgoingVelocity.y, tipResponse.outgoingVelocity.z].map(formatValue).join(', ')}</dd>
+        </dl>
+      ) : null}
+      {snapshot.lastTipRejection ? (
+        <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 border-t border-slate-700 pt-2">
+          <dt className="col-span-2 font-semibold text-amber-300">Last Tip Rejection</dt>
+          <dt>Reason</dt>
+          <dd>{snapshot.lastTipRejection.reason}</dd>
+          <dt>Player / Response</dt>
+          <dd>{snapshot.lastTipRejection.playerId} / {snapshot.lastTipRejection.responseStep}</dd>
         </dl>
       ) : null}
       {spikeResponse ? (
